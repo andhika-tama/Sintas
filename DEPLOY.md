@@ -295,7 +295,7 @@ php artisan db:seed --force
 ```
 
 - **`APP_KEY`**: salin nilainya dari `.env` ke tempat aman di luar server (pengelola kata sandi kantor). Kehilangan kunci ini membuat sesi dan tautan bertanda tangan tidak valid. Jangan pernah menggantinya setelah aplikasi dipakai.
-- **Seeder produksi** hanya menulis Irban, Objek, dan Jenis Penugasan. Klasifikasi datang dari migrasi. Tidak ada akun, PKPT, atau SPT yang dibuat.
+- **Seeder produksi** hanya menulis Irban (Irban I–IV, Irban Khusus, Sekretariat), Objek, dan Jenis Penugasan. Klasifikasi dan Kode Arsip (700, 800, 900) datang dari migrasi. Tidak ada akun, PKPT, atau SPT yang dibuat.
 
 > [!IMPORTANT]
 > Nama Objek dan Jenis Penugasan bawaan hanya **contoh**. Ganti dengan data sebenarnya lewat menu Admin sebelum aplikasi dipakai.

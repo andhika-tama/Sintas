@@ -26,7 +26,7 @@ abstract class NotifikasiKomentar extends NotifikasiSintas
         $this->nomor = $spt->nomor_lengkap ?: 'tanpa nomor';
         $this->konteks = $spt->nomor_lengkap
             ? "SPT {$spt->nomor_lengkap}"
-            : (collect([$spt->jenisPenugasan?->nama, Str::limit((string) $spt->uraian_untuk, 60)])->filter()->implode(' · ') ?: null);
+            : (collect([$spt->namaJenis(), Str::limit((string) $spt->uraian_untuk, 60)])->filter()->implode(' · ') ?: null);
         $this->url = route('spt.show', $spt, absolute: false).'#komentar-'.$root;
         $this->catatan = Str::limit($komentar->isi, 200);
     }

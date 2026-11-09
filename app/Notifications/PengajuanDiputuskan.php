@@ -25,7 +25,7 @@ class PengajuanDiputuskan extends NotifikasiSintas
         $this->nomor = $spt->nomor_lengkap;
         $this->konteks = $this->status === StatusPengajuan::Diterima
             ? "SPT {$spt->nomor_lengkap}"
-            : collect([$spt->jenisPenugasan?->nama, Str::limit((string) $spt->uraian_untuk, 60)])->filter()->implode(' · ');
+            : collect([$spt->namaJenis(), Str::limit((string) $spt->uraian_untuk, 60)])->filter()->implode(' · ');
         $this->catatan = $catatan;
         $this->sptId = $spt->id;
     }

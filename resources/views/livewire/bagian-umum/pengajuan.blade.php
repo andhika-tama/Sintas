@@ -71,8 +71,8 @@
                             <x-app.status-badge :status="$s->status()" class="shrink-0" />
                             <div class="min-w-0 flex-1 max-md:basis-full max-md:order-last">
                                 <p class="truncate font-medium">{{ $s->irban->nama }}</p>
-                                @if ($s->jenisPenugasan)
-                                    <x-app.type-chip :color="$s->jenisPenugasan->warna" :label="$s->jenisPenugasan->nama" class="max-w-full truncate !text-xs" />
+                                @if ($s->namaJenis())
+                                    <x-app.type-chip :color="$s->jenisPenugasan?->warna" :label="$s->namaJenis()" class="max-w-full truncate !text-xs" />
                                 @else
                                     <p class="truncate text-xs text-neutral-600 max-md:hidden" title="{{ $s->uraian_untuk }}">{{ $s->uraian_untuk ?: 'Tanpa jenis penugasan' }}</p>
                                 @endif

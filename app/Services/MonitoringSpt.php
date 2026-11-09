@@ -196,7 +196,7 @@ class MonitoringSpt
             'nomor_lengkap' => $spt->nomor_lengkap,
             'tanggal_spt' => $spt->tanggal_spt,
             'irban' => $spt->irban->nama,
-            'jenis' => $this->jenis($spt->jenisPenugasan),
+            'jenis' => $this->jenis($spt->jenisPenugasan) ?? ($spt->jenis_penugasan_lainnya !== null ? ['id' => null, 'nama' => $spt->jenis_penugasan_lainnya, 'warna' => null, 'warna_teks' => null] : null),
             'mulai' => $spt->tanggal_mulai,
             'selesai' => $spt->tanggal_selesai,
             'kesesuaian' => $kesesuaian,

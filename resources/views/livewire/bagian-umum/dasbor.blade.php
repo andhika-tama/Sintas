@@ -27,7 +27,7 @@
                         <a href="{{ route('bagian-umum.pengajuan', ['pilih' => $s->id]) }}" wire:navigate
                             class="flex min-h-11 flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2 hover:bg-mint-50">
                             <span class="font-semibold text-mint-700">{{ $s->irban->nama }}</span>
-                            <span class="min-w-0 flex-1 truncate text-neutral-600">{{ $s->jenisPenugasan?->nama ?? 'Tanpa jenis penugasan' }}</span>
+                            <span class="min-w-0 flex-1 truncate text-neutral-600">{{ $s->namaJenis() ?? 'Tanpa jenis penugasan' }}</span>
                             <span class="whitespace-nowrap text-xs font-medium tabular-nums text-neutral-600">{{ $umur }} hari</span>
                         </a>
                     </li>

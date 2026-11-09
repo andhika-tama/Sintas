@@ -37,7 +37,7 @@ class Dasbor extends Component
         $milik = fn () => Spt::where('irban_id', $irbanId);
 
         // Terlambat over all years (Perlu Tindakan); the card counts the ones in this year.
-        $penyusunan = $milik()->berstatus(StatusSpt::PenyusunanLaporan)->with('jenisPenugasan')->get();
+        $penyusunan = $milik()->berstatus(StatusSpt::PenyusunanLaporan)->with(['jenisPenugasan', 'objek'])->get();
         $flags = $penanda->untukBanyak($penyusunan);
         $terlambat = $penyusunan->filter(fn (Spt $s) => in_array('terlambat', $flags[$s->id], true));
         $terlambatTahunIni = $milik()->tahunPenugasan($tahun)->whereIn('id', $terlambat->modelKeys())->count();
@@ -81,7 +81,7 @@ class Dasbor extends Component
                 'label' => ['Draf', 'Menunggu Nomor', 'Perlu Revisi', 'Berjalan', 'Selesai'],
                 'nilai' => [$n($grafikStatus[0]), $n($grafikStatus[1]), $n($grafikStatus[2]), $berjalan, $n($grafikStatus[3])],
             ],
-            'terbaru' => $milik()->tahunPenugasan($tahun)->with('jenisPenugasan')->latest('updated_at')->latest('id')->limit(10)->get(),
+            'terbaru' => $milik()->tahunPenugasan($tahun)->with(['jenisPenugasan', 'objek'])->latest('updated_at')->latest('id')->limit(10)->get(),
         ]);
     }
 }

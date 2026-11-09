@@ -42,6 +42,8 @@ class PrivasiPublikTest extends TestCase
         'MK-ALASAN-perubahan', 'MK-SK-Perubahan-77', 'MK-ALASAN-usulan', 'MK-CATATAN-tutup', 'MK-KOMENTAR-putusan', 'perubahan-sk/mk-berkas.pdf',
         // Versi 1.1.4: Nomor SPPD stays internal.
         'MK-SPPD-0042',
+        // 1.2: free-text Lainnya jenis/objek of non-PKPT SPT.
+        'MK-JENIS-lainnya', 'MK-OBJEK-lainnya',
     ];
 
     protected function setUp(): void
@@ -53,6 +55,7 @@ class PrivasiPublikTest extends TestCase
         DB::table('spt')->update([
             'periode_diperiksa' => 'MK-PERIODE-2025', 'uraian_untuk' => 'MK-URAIAN-pemeriksaan', 'catatan_bagian_umum' => 'MK-CATATAN-bu',
             'nomor_lhp' => 'MK-LHP-900', 'nomor_sppd' => 'MK-SPPD-0042',
+            'jenis_penugasan_lainnya' => 'MK-JENIS-lainnya', 'objek_lainnya' => 'MK-OBJEK-lainnya',
         ]);
         DB::table('spt')->where('id', $this->v1->id)->update(['nomor_lengkap' => self::NOMOR]);
         Pegawai::query()->update(['nama_bergelar' => 'MK-PEGAWAI-Budi']);

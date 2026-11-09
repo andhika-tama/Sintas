@@ -3,7 +3,17 @@
 namespace Tests\Feature\Spt;
 
 use App\Actions\Spt\SimpanSpt;
+use App\Actions\Spt\TerimaPengajuan;
+use App\Enums\Role;
 use App\Enums\StatusPengajuan;
+use App\Livewire\BagianUmum\Dasbor as BuDasbor;
+use App\Livewire\BagianUmum\Pengajuan;
+use App\Livewire\BagianUmum\Register;
+use App\Livewire\Irban\Dasbor as IrbanDasbor;
+use App\Livewire\Irban\SptSaya;
+use App\Livewire\Pimpinan\Monitoring;
+use App\Livewire\Rekap as RekapHalaman;
+use App\Livewire\Spt\Detail;
 use App\Models\Irban;
 use App\Models\IrbanTahunan;
 use App\Models\JenisPenugasan;
@@ -15,10 +25,17 @@ use App\Models\Pkpt;
 use App\Models\PkptItem;
 use App\Models\Spt;
 use App\Models\User;
+use App\Notifications\PengajuanBaru;
+use App\Notifications\PengajuanDiputuskan;
+use App\Services\Ekspor;
+use App\Services\RekapTriwulan;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
+use Livewire\Livewire;
+use PhpOffice\PhpSpreadsheet\IOFactory;
 use Tests\TestCase;
 
 /** 1.2 Task 4 (K3, R3): free-text "Lainnya" for jenis penugasan and objek on a non-PKPT SPT. */
@@ -169,5 +186,122 @@ class SptLainnyaTest extends TestCase
         $log = $spt->activities()->where('event', 'updated')->get()->first(fn ($a) => isset($a->properties['attributes']['objek_lainnya']));
         $this->assertSame('Aula Kantor Bupati', $log?->properties['old']['objek_lainnya']);
         $this->assertSame('Gedung DPRD', $log->properties['attributes']['objek_lainnya']);
+    }
+
+    // ---- 1.2 Task 5: readers --------------------------------------------------------------------------------------------------------
+
+    private const JENIS_TXT = 'MK-JENIS-Pendampingan BPK';
+
+    private const OBJEK_TXT = 'MK-OBJEK-Desa Tanpa Master';
+
+    /** An accepted, numbered non-PKPT SPT with both Lainnya texts and a master objek (jenis_penugasan_id null). */
+    private function lainnya(): Spt
+    {
+        $spt = Spt::factory()->menungguNomor()->create([
+            'irban_id' => $this->user->irban_id, 'dibuat_oleh' => $this->user->id, 'jenis_penugasan_id' => null,
+            'jenis_penugasan_lainnya' => self::JENIS_TXT, 'objek_lainnya' => self::OBJEK_TXT, 'ppj_pegawai_id' => $this->ppj->id,
+        ]);
+        $spt->objek()->attach(Objek::factory()->create(['nama' => 'Dinas Master'])->id);
+
+        return app(TerimaPengajuan::class)->handle(User::factory()->create(['role' => Role::BagianUmum]), $spt)->fresh();
+    }
+
+    public function test_model_names(): void
+    {
+        $spt = $this->lainnya();
+
+        $this->assertSame(self::JENIS_TXT, $spt->namaJenis());
+        $this->assertSame(['Dinas Master', self::OBJEK_TXT], $spt->namaObjek());
+    }
+
+    public function test_detail_irban_and_bagian_umum_screens_show_the_texts(): void
+    {
+        $spt = $this->lainnya();
+        $bu = User::factory()->create(['role' => Role::BagianUmum]);
+
+        Livewire::actingAs($this->user)->test(Detail::class, ['spt' => $spt])->assertSee([self::JENIS_TXT, self::OBJEK_TXT, 'Dinas Master']);
+        Livewire::actingAs($this->user)->test(SptSaya::class)->assertSee(self::JENIS_TXT);
+        Livewire::actingAs($this->user)->test(IrbanDasbor::class)->assertSee(self::JENIS_TXT);
+        Livewire::actingAs($bu)->test(Register::class)->assertSee([self::JENIS_TXT, self::OBJEK_TXT]);
+        Livewire::actingAs($bu)->test(BuDasbor::class)->assertOk();
+    }
+
+    public function test_pengajuan_bu_shows_the_texts(): void
+    {
+        $bu = User::factory()->create(['role' => Role::BagianUmum]);
+        $spt = Spt::factory()->menungguNomor()->create([
+            'irban_id' => $this->user->irban_id, 'jenis_penugasan_id' => null, 'jenis_penugasan_lainnya' => self::JENIS_TXT, 'objek_lainnya' => self::OBJEK_TXT,
+        ]);
+
+        Livewire::actingAs($bu)->test(Pengajuan::class)->assertSee(self::JENIS_TXT)
+            ->call('pilihSpt', $spt->id)->assertSee([self::JENIS_TXT, self::OBJEK_TXT]);
+    }
+
+    public function test_register_and_monitoring_exports_and_screen(): void
+    {
+        $this->lainnya();
+        $bu = User::factory()->create(['role' => Role::BagianUmum]);
+        $pimpinan = User::factory()->pimpinan()->create();
+        $isi = fn ($r) => json_encode(IOFactory::load($r->getFile()->getPathname())->getActiveSheet()->toArray(), JSON_UNESCAPED_UNICODE);
+
+        $register = $isi(app(Ekspor::class)->minta($bu, 'register', 'xlsx', ['tahun' => '2026']));
+        $this->assertStringContainsString(self::JENIS_TXT, $register);
+        $this->assertStringContainsString(self::OBJEK_TXT, $register);
+
+        app(Ekspor::class)->minta($pimpinan, 'monitoring', 'xlsx', ['tahun' => '2026']);
+        Livewire::actingAs($pimpinan)->test(Monitoring::class)->assertSee('Di luar PKPT')->assertSee(self::JENIS_TXT);
+        Livewire::actingAs($pimpinan)->test(Monitoring::class)->set('tampilan', 'spt')->assertSee(self::JENIS_TXT);
+    }
+
+    public function test_rekap_triwulan_groups_every_lainnya_spt_in_one_row(): void
+    {
+        $this->lainnya();
+        $this->lainnya();
+        Spt::factory()->diterima()->create(['irban_id' => $this->user->irban_id, 'jenis_penugasan_id' => null, 'jenis_penugasan_lainnya' => 'Teks lain sama sekali']);
+
+        $baris = app(RekapTriwulan::class)->hitung(2026)['jenis']['baris'];
+        $lainnya = array_values(array_filter($baris, fn ($b) => $b['nama'] === Spt::LABEL_LAINNYA));
+
+        $this->assertCount(1, $lainnya);
+        $this->assertSame(3, $lainnya[0]['total']['jumlah']);
+        $this->assertNull($lainnya[0]['id']);
+        $this->assertNotContains('Tanpa jenis penugasan', array_column($baris, 'nama'));
+    }
+
+    public function test_rekap_screen_and_tahunan_export_do_not_fail(): void
+    {
+        $this->lainnya();
+        $pimpinan = User::factory()->pimpinan()->create();
+        $bu = User::factory()->create(['role' => Role::BagianUmum]);
+
+        Livewire::actingAs($pimpinan)->test(RekapHalaman::class)->assertOk();
+        $r = app(Ekspor::class)->minta($bu, 'rekap-tahunan', 'xlsx', ['tahun' => '2026']);
+        $this->assertSame(12, IOFactory::load($r->getFile()->getPathname())->getSheetCount());
+        app(Ekspor::class)->minta($pimpinan, 'rekap', 'xlsx', ['tahun' => '2026']);
+    }
+
+    public function test_notification_context_uses_the_free_text_jenis(): void
+    {
+        $spt = $this->lainnya();
+
+        $this->assertStringContainsString(self::JENIS_TXT, (new PengajuanBaru($spt))->toArray($this->user)['konteks']);
+        $this->assertStringContainsString(self::JENIS_TXT, (new PengajuanDiputuskan($spt->forceFill(['status_pengajuan' => StatusPengajuan::PerluRevisi])))->toArray($this->user)['konteks']);
+    }
+
+    public function test_irban_dasbor_query_count_is_constant(): void
+    {
+        $this->lainnya();
+        $hitung = function () {
+            DB::flushQueryLog();
+            DB::enableQueryLog();
+            Livewire::actingAs($this->user)->test(IrbanDasbor::class);
+
+            return count(DB::getQueryLog());
+        };
+        $hitung(); // warm caches
+        $satu = $hitung();
+        $this->lainnya();
+        $this->lainnya();
+        $this->assertSame($satu, $hitung());
     }
 }

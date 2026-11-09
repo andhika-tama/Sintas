@@ -39,7 +39,7 @@
                 @foreach ($penanda as $p)<x-app.flag :jenis="$p" />@endforeach
             </div>
             <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-neutral-600">
-                @if ($spt->jenisPenugasan)<x-app.type-chip :color="$spt->jenisPenugasan->warna" :label="$spt->jenisPenugasan->nama" />@endif
+                @if ($spt->namaJenis())<x-app.type-chip :color="$spt->jenisPenugasan?->warna" :label="$spt->namaJenis()" />@endif
                 <span>{{ $spt->klasifikasi->nama }}</span>
                 <span>{{ $spt->irban->nama }}</span>
             </div>
@@ -79,7 +79,7 @@
                     <div class="{{ $baris }}"><dt class="text-neutral-600">Untuk</dt><dd class="whitespace-pre-line">{{ $spt->uraian_untuk ?: '—' }}</dd></div>
                     <div class="{{ $baris }}">
                         <dt class="text-neutral-600">Wilayah/Objek</dt>
-                        <dd>{{ $spt->objek->map(fn ($o) => $o->parent ? $o->parent->nama.' › '.$o->nama : $o->nama)->join(', ') ?: '—' }}</dd>
+                        <dd>{{ implode(', ', $spt->namaObjek(true)) ?: '—' }}</dd>
                     </div>
                     <div class="{{ $baris }}"><dt class="text-neutral-600">Kode Arsip</dt><dd>{{ $spt->kodeArsip ? $spt->kodeArsip->kode.' · '.$spt->kodeArsip->nama : '—' }}</dd></div>
                     <div class="{{ $baris }}"><dt class="text-neutral-600">Periode diperiksa</dt><dd>{{ $spt->periode_diperiksa ?: '—' }}</dd></div>

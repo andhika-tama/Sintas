@@ -3,7 +3,7 @@
      the visual order. Motion: count-up on the cards and the chart draw-in only, both off under prefers-reduced-motion. --}}
 @use('App\Support\Tanggal')
 @php
-    $judul = fn ($s) => $s->nomor_lengkap ?: 'Draf: '.(collect([$s->jenisPenugasan?->nama, $s->objek->pluck('nama')->implode(', ')])->filter()->implode(' ') ?: \Illuminate\Support\Str::limit($s->uraian_untuk ?? '#'.$s->id, 60));
+    $judul = fn ($s) => $s->nomor_lengkap ?: 'Draf: '.(collect([$s->namaJenis(), implode(', ', $s->namaObjek())])->filter()->implode(' ') ?: \Illuminate\Support\Str::limit($s->uraian_untuk ?? '#'.$s->id, 60));
     $tanggal = fn ($s) => $s->tanggal_mulai && $s->tanggal_selesai ? Tanggal::rentang($s->tanggal_mulai, $s->tanggal_selesai) : '—';
     $ringkasan = 'Grafik batang bertumpuk Status SPT '.$tahun.': '
         .collect($grafik['label'])->map(fn ($l, $i) => $l.' '.$grafik['nilai'][$i])->implode(', ').'.';
@@ -125,7 +125,7 @@
                     <tr wire:key="t-{{ $s->id }}">
                         <td class="whitespace-nowrap"><x-app.status-badge :status="$s->status()" /></td>
                         <td class="whitespace-nowrap">@include('livewire.irban.partials.nomor-spt')</td>
-                        <td>@if ($s->jenisPenugasan)<x-app.type-chip :color="$s->jenisPenugasan->warna" :label="$s->jenisPenugasan->nama" />@else<span class="text-neutral-500">—</span>@endif</td>
+                        <td>@if ($s->namaJenis())<x-app.type-chip :color="$s->jenisPenugasan?->warna" :label="$s->namaJenis()" />@else<span class="text-neutral-500">—</span>@endif</td>
                         <td class="whitespace-nowrap tabular-nums">{{ $tanggal($s) }}</td>
                     </tr>
                 @endforeach
@@ -138,7 +138,7 @@
                             <span class="tabular-nums text-neutral-600">{{ $tanggal($s) }}</span>
                         </div>
                         <p class="mt-2 break-words">@include('livewire.irban.partials.nomor-spt')</p>
-                        @if ($s->jenisPenugasan)<x-app.type-chip class="mt-2" :color="$s->jenisPenugasan->warna" :label="$s->jenisPenugasan->nama" />@endif
+                        @if ($s->namaJenis())<x-app.type-chip class="mt-2" :color="$s->jenisPenugasan?->warna" :label="$s->namaJenis()" />@endif
                     </li>
                 @endforeach
             </ul>

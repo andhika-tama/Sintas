@@ -43,6 +43,7 @@ class RekapTriwulan
         $perJenis = $kosong($jenis, $jn);
         // Key 0 = "Tanpa jenis penugasan": SPT without a jenis, and any jenis id missing from the list above (created meanwhile).
         $perJenis[0] = array_fill(1, 4, $jn);
+        $perJenis[-1] = array_fill(1, 4, $jn); // SPT with a free-text jenis (Lainnya): one group for all values
         $kunciJenis = fn (?int $id) => isset($perJenis[$id]) ? $id : 0;
 
         $items = PkptItem::aktif()
@@ -79,12 +80,15 @@ class RekapTriwulan
                 $perKlasifikasi[$spt->klasifikasi_id][$tw]['jumlah']++;
                 $perKlasifikasi[$spt->klasifikasi_id][$tw][$selesai ? 'selesai' : 'berjalan']++;
             }
-            $k = $kunciJenis($spt->jenis_penugasan_id);
+            $k = $spt->jenis_penugasan_id === null && $spt->jenis_penugasan_lainnya !== null ? -1 : $kunciJenis($spt->jenis_penugasan_id);
             $perJenis[$k][$tw]['realisasi'] += $realisasi;
             $perJenis[$k][$tw]['jumlah']++;
         }
 
         $barisJenis = $jenis->map(fn ($j) => ['id' => $j->id, 'nama' => $j->nama, ...$this->tabel($perJenis[$j->id])])->all();
+        if (array_sum(array_column($perJenis[-1], 'jumlah')) > 0) {
+            $barisJenis[] = ['id' => null, 'nama' => Spt::LABEL_LAINNYA, ...$this->tabel($perJenis[-1])];
+        }
         if (array_sum(array_column($perJenis[0], 'jumlah')) + array_sum(array_column($perJenis[0], 'rencana')) > 0) {
             $barisJenis[] = ['id' => null, 'nama' => 'Tanpa jenis penugasan', ...$this->tabel($perJenis[0])];
         }

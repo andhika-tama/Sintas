@@ -34,10 +34,14 @@ class Spt extends Model
         return $this->jenisPenugasan?->nama ?? $this->jenis_penugasan_lainnya;
     }
 
-    /** @return list<string> master objek names sorted by name, then objek_lainnya when set. */
-    public function namaObjek(): array
+    /**
+     * @param  bool  $denganInduk  "Induk › Nama" for a child objek (needs objek.parent loaded)
+     * @return list<string> master objek names sorted by name, then objek_lainnya when set.
+     */
+    public function namaObjek(bool $denganInduk = false): array
     {
-        $nama = $this->objek->pluck('nama')->sort(SORT_NATURAL | SORT_FLAG_CASE)->values()->all();
+        $nama = $this->objek->map(fn ($o) => $denganInduk && $o->parent ? $o->parent->nama.' › '.$o->nama : $o->nama)
+            ->sort(SORT_NATURAL | SORT_FLAG_CASE)->values()->all();
         if ($this->objek_lainnya !== null && $this->objek_lainnya !== '') {
             $nama[] = $this->objek_lainnya;
         }

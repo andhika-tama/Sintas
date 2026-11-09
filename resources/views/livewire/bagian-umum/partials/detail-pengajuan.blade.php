@@ -67,11 +67,11 @@
         </div>
         <div class="{{ $baris }}">
             <dt class="text-neutral-600">Jenis penugasan</dt>
-            <dd>@if ($spt->jenisPenugasan)<x-app.type-chip :color="$spt->jenisPenugasan->warna" :label="$spt->jenisPenugasan->nama" />@else — @endif</dd>
+            <dd>@if ($spt->namaJenis())<x-app.type-chip :color="$spt->jenisPenugasan?->warna" :label="$spt->namaJenis()" />@else — @endif</dd>
         </div>
         <div class="{{ $baris }}">
             <dt class="text-neutral-600">Objek</dt>
-            <dd>{{ $spt->objek->map(fn ($o) => $o->parent ? $o->parent->nama.' › '.$o->nama : $o->nama)->join(', ') ?: '—' }}</dd>
+            <dd>{{ implode(', ', $spt->namaObjek(true)) ?: '—' }}</dd>
         </div>
         <div class="{{ $baris }}"><dt class="text-neutral-600">Periode diperiksa</dt><dd>{{ $spt->periode_diperiksa ?: '—' }}</dd></div>
         <div class="{{ $baris }}"><dt class="text-neutral-600">Untuk</dt><dd class="whitespace-pre-line">{{ $spt->uraian_untuk ?: '—' }}</dd></div>

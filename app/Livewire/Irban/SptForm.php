@@ -11,6 +11,7 @@ use App\Enums\StatusPengajuan;
 use App\Models\IrbanTahunan;
 use App\Models\JenisPenugasan;
 use App\Models\Klasifikasi;
+use App\Models\KodeArsip;
 use App\Models\Objek;
 use App\Models\Pegawai;
 use App\Models\PkptItem;
@@ -363,6 +364,7 @@ class SptForm extends Component
             'dokumen' => $spt?->dokumen->firstWhere('jenis', 'draf'),
             'klasifikasiList' => Klasifikasi::orderBy('id')->get(),
             'klasifikasi' => $this->klasifikasi(),
+            'kodeArsipOptions' => KodeArsip::orderBy('kode')->get()->mapWithKeys(fn ($k) => [$k->id => $k->kode.' · '.$k->nama])->all(),
             'itemOptions' => $items->mapWithKeys(fn ($i) => [$i->id => $i->jenisPenugasan->nama.' · '.$rentang[$i->id]])->all(),
             'item' => $item,
             'itemRentang' => $item ? $rentang[$item->id] : null,

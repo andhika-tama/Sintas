@@ -218,6 +218,7 @@ class Register extends Component
             'statusOptions' => collect([StatusPengajuan::Diterima, StatusPengajuan::Dibatalkan])->mapWithKeys(fn ($s) => [$s->value => $s->label()])->all(),
             'bulanOptions' => collect(range(1, 12))->mapWithKeys(fn ($m) => [$m => CarbonImmutable::create(2000, $m, 1)->translatedFormat('F')])->all(),
             'klasifikasiOptions' => Klasifikasi::orderBy('id')->pluck('nama', 'id')->all(),
+            'kodeArsipOptions' => KodeArsip::orderBy('kode')->get()->mapWithKeys(fn ($k) => [$k->id => $k->kode.' · '.$k->nama])->all(),
             'jenisOptions' => JenisPenugasan::orderBy('nama')->pluck('nama', 'id')->all(),
             'perIrban' => $perIrban,
             'awalTerkunci' => $register->nomorAwalTerkunci($this->tahun, $perIrban ? $awalIrban : null),

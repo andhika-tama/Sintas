@@ -139,6 +139,8 @@
                 :value="$manual['irban_id'] ?? ''" :error="$errors->first('manual.irban_id')" />
             <x-ui.select label="Klasifikasi" name="manual_klasifikasi" id="manual-klasifikasi" wire:model.live="manual.klasifikasi_id" :options="$klasifikasiOptions" placeholder="Pilih klasifikasi" required
                 :value="$manual['klasifikasi_id'] ?? ''" :error="$errors->first('manual.klasifikasi_id')" />
+            <x-ui.select label="Kode arsip" name="manual_kode_arsip" id="manual-kode-arsip" wire:model.live="manual.kode_arsip_id" :options="$kodeArsipOptions" placeholder="Pilih kode arsip" required
+                :value="$manual['kode_arsip_id'] ?? ''" :error="$errors->first('manual.kode_arsip_id')" />
             <x-ui.select label="Jenis penugasan" name="manual_jenis" id="manual-jenis" wire:model="manual.jenis_penugasan_id" :options="$jenisOptions" placeholder="Tanpa jenis penugasan"
                 :value="$manual['jenis_penugasan_id'] ?? ''" :error="$errors->first('manual.jenis_penugasan_id')" />
             <x-ui.textarea label="Perihal" name="manual_perihal" id="manual-perihal" wire:model="manual.uraian_untuk" rows="3" maxlength="1000" required
@@ -157,7 +159,7 @@
             <div>
                 <p class="text-sm font-medium text-neutral-900">Nomor yang akan terbit</p>
                 <p class="mt-1.5 rounded-md border border-mint-200 bg-mint-50 px-4 py-3 text-center font-sans text-xl font-bold [overflow-wrap:anywhere] text-neutral-900 tabular-nums" aria-live="polite">
-                    {{ $pratinjau ?: 'Pilih Irban untuk melihat nomor' }}
+                    {{ $pratinjau ?: 'Pilih Irban, klasifikasi, dan kode arsip untuk melihat nomor' }}
                 </p>
                 <p class="mt-1.5 text-xs text-neutral-500">Nomor diambil dari urutan yang sama dengan pengajuan Irban dan baru pasti saat Anda menekan "Terbitkan Nomor".</p>
             </div>

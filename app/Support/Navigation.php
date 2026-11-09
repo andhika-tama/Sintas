@@ -41,6 +41,7 @@ class Navigation
                     $item('Objek Pemeriksaan', 'admin.objek', 'building-library'),
                     $item('Wilayah Irban', 'admin.wilayah-irban', 'map'),
                     $item('Jenis Penugasan', 'admin.jenis-penugasan', 'swatch'),
+                    $item('Kode Arsip', 'admin.kode-arsip', 'archive-box'),
                     $item('Klasifikasi & Aturan', 'admin.klasifikasi', 'tag'),
                 ]],
                 ['label' => null, 'items' => [$item('PKPT', 'admin.pkpt', 'calendar-days')]],

@@ -16,6 +16,7 @@ use App\Livewire\Admin\Irban;
 use App\Livewire\Admin\IrbanTahunan;
 use App\Livewire\Admin\JenisPenugasan;
 use App\Livewire\Admin\Klasifikasi;
+use App\Livewire\Admin\KodeArsip;
 use App\Livewire\Admin\Kontak;
 use App\Livewire\Admin\LatarMasuk;
 use App\Livewire\Admin\Objek;
@@ -93,6 +94,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/objek', Objek::class)->name('admin.objek');
         Route::get('/wilayah-irban', WilayahIrban::class)->name('admin.wilayah-irban');
         Route::get('/jenis-penugasan', JenisPenugasan::class)->name('admin.jenis-penugasan');
+        Route::get('/kode-arsip', KodeArsip::class)->name('admin.kode-arsip');
         Route::get('/pkpt', Pkpt::class)->name('admin.pkpt');
         Route::get('/pkpt/{pkpt}', PkptDetail::class)->name('admin.pkpt.show');
         Route::get('/pkpt/{pkpt}/impor', PkptImpor::class)->name('admin.pkpt.impor');

@@ -81,6 +81,7 @@
                         <dt class="text-neutral-600">Wilayah/Objek</dt>
                         <dd>{{ $spt->objek->map(fn ($o) => $o->parent ? $o->parent->nama.' › '.$o->nama : $o->nama)->join(', ') ?: '—' }}</dd>
                     </div>
+                    <div class="{{ $baris }}"><dt class="text-neutral-600">Kode Arsip</dt><dd>{{ $spt->kodeArsip ? $spt->kodeArsip->kode.' · '.$spt->kodeArsip->nama : '—' }}</dd></div>
                     <div class="{{ $baris }}"><dt class="text-neutral-600">Periode diperiksa</dt><dd>{{ $spt->periode_diperiksa ?: '—' }}</dd></div>
                     <div class="{{ $baris }}">
                         <dt class="text-neutral-600">Periode pelaksanaan</dt>

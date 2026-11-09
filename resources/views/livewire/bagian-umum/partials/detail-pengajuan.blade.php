@@ -50,6 +50,7 @@
 
     <dl class="divide-y divide-neutral-200">
         <div class="{{ $baris }}"><dt class="text-neutral-600">Klasifikasi</dt><dd>{{ $spt->klasifikasi->nama }}</dd></div>
+        <div class="{{ $baris }}"><dt class="text-neutral-600">Kode Arsip</dt><dd>{{ $spt->kodeArsip ? $spt->kodeArsip->kode.' · '.$spt->kodeArsip->nama : '—' }}</dd></div>
         <div class="{{ $baris }}">
             <dt class="text-neutral-600">Item PKPT</dt>
             <dd>

@@ -7,6 +7,7 @@ use Database\Factories\KodeArsipFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /** Kode arsip of an SPT number (`{kode_arsip}`), picked per SPT (1.2 Task 2). Issued numbers keep their kode when a row changes. */
 #[Fillable(['kode', 'nama'])]
@@ -16,4 +17,9 @@ class KodeArsip extends Model
     use DicatatAktivitas, HasFactory;
 
     protected $table = 'kode_arsip';
+
+    public function spt(): HasMany
+    {
+        return $this->hasMany(Spt::class);
+    }
 }

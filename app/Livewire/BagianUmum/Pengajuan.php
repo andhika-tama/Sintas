@@ -214,7 +214,7 @@ class Pengajuan extends Component
         Gate::authorize('kelolaNomor', Spt::class);
         $jumlah = $this->filter()->selectRaw('status_pengajuan, count(*) as n')->groupBy('status_pengajuan')->pluck('n', 'status_pengajuan');
         $detail = $this->pilih ? Spt::where('status_pengajuan', '!=', StatusPengajuan::Draf)->with([
-            'irban', 'klasifikasi', 'jenisPenugasan', 'pkptItem.pkpt', 'pkptItem.jenisPenugasan', 'ppj', 'objek.parent', 'personel.pegawai', 'dokumen',
+            'irban', 'klasifikasi', 'kodeArsip', 'jenisPenugasan', 'pkptItem.pkpt', 'pkptItem.jenisPenugasan', 'ppj', 'objek.parent', 'personel.pegawai', 'dokumen',
             'riwayat' => fn ($q) => $q->with('olehUser')->latest('id'),
         ])->find($this->pilih) : null;
 

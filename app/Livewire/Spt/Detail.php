@@ -215,7 +215,7 @@ class Detail extends Component
     private function spt(): Spt
     {
         $spt = Spt::with([
-            'irban', 'klasifikasi', 'jenisPenugasan', 'pkptItem.pkpt', 'pkptItem.jenisPenugasan', 'ppj', 'objek.parent', 'personel.pegawai',
+            'irban', 'klasifikasi', 'kodeArsip', 'jenisPenugasan', 'pkptItem.pkpt', 'pkptItem.jenisPenugasan', 'ppj', 'objek.parent', 'personel.pegawai',
             'dokumen' => fn ($q) => $q->with(['diunggahOleh', 'diinputOleh'])->orderBy('created_at')->orderBy('id'),
             'riwayat' => fn ($q) => $q->with(['olehUser', 'diinputOleh'])->orderBy('created_at')->orderBy('id'),
             'kendala.dibuatOleh', 'kendala.diinputOleh',

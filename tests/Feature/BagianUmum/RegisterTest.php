@@ -168,8 +168,8 @@ class RegisterTest extends TestCase
             ->set('alasan', 'Salah ketik perihal SPT')->call('batalkan')->assertHasNoErrors()->assertSet('showBatal', false)->assertDispatched('toast');
         $this->assertSame(StatusPengajuan::Dibatalkan, $spt->fresh()->status_pengajuan);
 
-        $c = $this->register()->call('bukaManual')->assertSet('showManual', true)->assertSee('Gunakan hanya untuk SPT mendesak.')
-            ->set('manual.irban_id', (string) $this->irban->id)->assertSet('pratinjau', '')
+        $c = $this->register()->call('bukaManual')->assertSet('showManual', true)->assertSee('Gunakan hanya untuk SPT mendesak.')->assertSee('700 · Pengawasan Umum', false)
+            ->set('manual.irban_id', (string) $this->irban->id)->assertSet('pratinjau', '')->assertSee('Pilih Irban, klasifikasi, dan kode arsip untuk melihat nomor')
             ->set('manual.klasifikasi_id', (string) Klasifikasi::where('kode', 'KHUSUS')->value('id'))
             ->set('manual.kode_arsip_id', (string) KodeArsip::where('kode', '800')->value('id'))->assertSet('pratinjau', '800/2/INSPEKTORAT-II/SPT/2026');
         $c->set('manual', $this->manual(['irban_id' => (string) $this->irban->id]))->call('catatManual')->assertHasNoErrors()->assertSet('showManual', false)

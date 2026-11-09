@@ -3,7 +3,7 @@
      Text fields are deferred/blur so typing never round-trips; only fields that drive warnings, durasi or the suggestion are live. --}}
 @php
     $fields = [
-        'diinput_oleh' => 'Diinput oleh', 'klasifikasi_id' => 'Klasifikasi', 'pkpt_item_id' => 'Item PKPT', 'jenis_penugasan_id' => 'Jenis penugasan',
+        'diinput_oleh' => 'Diinput oleh', 'klasifikasi_id' => 'Klasifikasi', 'kode_arsip_id' => 'Kode arsip', 'pkpt_item_id' => 'Item PKPT', 'jenis_penugasan_id' => 'Jenis penugasan',
         'objek_ids' => 'Wilayah/Objek', 'tanggal_mulai' => 'Tanggal mulai', 'tanggal_selesai' => 'Tanggal selesai', 'periode_diperiksa' => 'Periode diperiksa',
         'uraian_untuk' => 'Untuk', 'ppj_pegawai_id' => 'PPJ', 'personel' => 'Susunan Personel', 'lampiran' => 'Lampiran draf', 'catatan_bagian_umum' => 'Catatan untuk Bagian Umum',
     ];
@@ -87,6 +87,9 @@
                 </div>
                 <x-ui.field-meta part="meta" id="klasifikasi_id" :error="$errors->first('klasifikasi_id')" />
             </fieldset>
+
+            <x-ui.select label="Kode arsip" name="kode_arsip_id" wire:model="kode_arsip_id" :options="$kodeArsipOptions" placeholder="Pilih kode arsip" required
+                :value="$kode_arsip_id" helper="Tampil pada nomor SPT, sebelum kode unit." :error="$errors->first('kode_arsip_id')" />
 
             <div>
                 @unless ($non_pkpt)

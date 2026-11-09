@@ -41,6 +41,7 @@ class DashboardShellTest extends TestCase
         $html = $this->actingAs($admin)->get('/admin')->assertOk()
             ->assertSee('aria-label="Navigasi utama"', false)
             ->assertSee('Master Data')
+            ->assertSee('href="'.route('admin.kode-arsip').'"', false)
             ->assertSee('href="'.route('admin.impor').'"', false)
             ->assertSee('Pengaturan Sistem')
             ->assertSee('Ciutkan menu')

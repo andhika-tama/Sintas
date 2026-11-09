@@ -264,6 +264,7 @@ class SptFormTest extends TestCase
         $this->assertSame(StatusPengajuan::Draf, $spt->status_pengajuan);
         $this->assertSame([$this->ppj->id, $this->budi->id], $spt->personel->pluck('pegawai_id')->all());
         $page->assertSet('sptId', $spt->id);
+        $this->assertNull($spt->kode_arsip_id);
 
         // Second save updates the same SPT.
         $page->set('catatan_bagian_umum', 'Mohon diproses.')->call('simpan');
@@ -306,6 +307,18 @@ class SptFormTest extends TestCase
         $this->actingAs($this->user)->get(route('irban.spt.ubah', $spt))->assertOk()->assertSee('Periode pemeriksaan belum tepat.');
         $this->form($spt)->assertSet('sptId', $spt->id)->assertSet('periode_diperiksa', 'Tahun Anggaran 2025')
             ->assertSet('kode_arsip_id', $spt->kode_arsip_id)->assertSet('personel.0.pegawai_id', $this->budi->id)->assertSet('personel.0.peran', 'ketua');
+    }
+
+    public function test_kode_arsip_select_is_listed_saved_and_reloaded(): void
+    {
+        $k = KodeArsip::where('kode', '800')->firstOrFail();
+        $this->actingAs($this->user)->get('/irban/spt/ajukan')->assertOk()->assertSee('Kode arsip')->assertSee('700 · Pengawasan Umum', false)
+            ->assertSee('800 · Kepegawaian', false);
+        $c = $this->form()->set('diinput_oleh', $this->budi->id)->set('klasifikasi_id', $this->klas('KHUSUS'))->set('kode_arsip_id', $k->id)
+            ->call('toggleTim', $this->tim1->id)->call('simpan')->assertHasNoErrors();
+        $spt = Spt::sole();
+        $this->assertSame($k->id, $spt->kode_arsip_id);
+        $this->form($spt)->assertSet('kode_arsip_id', $k->id)->assertSee('800 · Kepegawaian', false);
     }
 
     public function test_draf_saved_as_non_pkpt_reloads_checked(): void

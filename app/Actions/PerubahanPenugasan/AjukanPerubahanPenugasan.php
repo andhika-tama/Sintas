@@ -62,7 +62,9 @@ class AjukanPerubahanPenugasan
             // and two submissions for one item queue here so R2 holds.
             Pkpt::whereKey($pkpt->id)->lockForUpdate()->first();
             $item = self::itemSendiri($user, $item->id);
-            if (PerubahanPenugasan::where('pkpt_item_id', $item->id)->where('status', StatusPerubahanPenugasan::Diajukan->value)->exists()) {
+            // Scoped to the item's irban: an open request of the irban the item moved away from does not block the new irban.
+            if (PerubahanPenugasan::where('pkpt_item_id', $item->id)->where('irban_id', $item->irban_id)
+                ->where('status', StatusPerubahanPenugasan::Diajukan->value)->exists()) {
                 throw ValidationException::withMessages(['item' => self::MASIH_DIAJUKAN]);
             }
 

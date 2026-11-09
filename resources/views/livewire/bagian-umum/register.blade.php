@@ -88,7 +88,7 @@
                         <td class="whitespace-nowrap">{{ $d['sppd'] ?? $kosong }}</td>
                         <td class="whitespace-nowrap">{{ $d['klasifikasi'] ?? $kosong }}</td>
                         <td>@include('livewire.bagian-umum.partials.teks-panjang', ['teks' => $d['item'], 'id' => "item-{$s->id}"])</td>
-                        <td class="min-w-36">{{ $d['jenis'] ?? $kosong }}</td>
+                        <td class="min-w-36 [overflow-wrap:anywhere]">{{ $d['jenis'] ?? $kosong }}</td>
                         <td>@include('livewire.bagian-umum.partials.teks-panjang', ['teks' => $d['objek'], 'id' => "objek-{$s->id}"])</td>
                         <td class="whitespace-nowrap">{{ $d['mulai'] ?? $kosong }}</td>
                         <td class="whitespace-nowrap">{{ $d['selesai'] ?? $kosong }}</td>

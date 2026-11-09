@@ -66,7 +66,7 @@ class MigrasiUsulanTest extends TestCase
         $user = User::factory()->irban()->create(['irban_id' => $irban->id]);
         $pegawai = Pegawai::factory()->create();
         $pkpt = Pkpt::factory()->disahkan()->create(['tahun' => 2026]);
-        $item = fn (array $x = []) => PkptItem::factory()->create(['pkpt_id' => $pkpt->id, 'irban_id' => $irban->id] + $x);
+        $item = fn (array $x = []) => PkptItem::factory()->create($x + ['pkpt_id' => $pkpt->id, 'irban_id' => $irban->id]);
         [$a, $b, $c, $d] = [$item(), $item(), $item(), $item()];
         $dihapus = $item(['status' => StatusItemPkpt::Dihapus]);
         $sudah = PerubahanPenugasan::factory()->create(['pkpt_item_id' => $d->id, 'irban_id' => $irban->id]);
@@ -85,6 +85,10 @@ class MigrasiUsulanTest extends TestCase
         $usulan($c, ['alasan' => 'Terbaru', 'tanggal_mulai' => '2026-06-01', 'tanggal_selesai' => '2026-06-05']);
         $usulan($d); // R2: d already has a Diajukan request
         $usulan($dihapus);
+        // Review akhir: dead on arrival (moved to another irban, or the item already has the dates) and a non-geser usulan with dates.
+        $usulan($item(['irban_id' => Irban::factory()->create()->id]));
+        $usulan($item(['tanggal_mulai' => '2026-05-04', 'tanggal_selesai' => '2026-05-15']));
+        $usulan($item(), ['aksi_usulan' => 'lainnya']);
         DB::table('pkpt_perubahan_item')->insert(['perubahan_id' => $paket->id, 'aksi' => 'ubah', 'pkpt_item_id' => $b->id, 'data_baru' => '{}',
             'usulan_id' => $ditampung, 'urutan' => 1, 'created_at' => now(), 'updated_at' => now()]);
 

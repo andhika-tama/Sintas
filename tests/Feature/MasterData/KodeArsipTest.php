@@ -2,12 +2,14 @@
 
 namespace Tests\Feature\MasterData;
 
+use App\Actions\MasterData\SaveKodeArsip;
 use App\Enums\Role;
 use App\Livewire\Admin\KodeArsip as Page;
 use App\Models\KodeArsip;
 use App\Models\Spt;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -59,6 +61,17 @@ class KodeArsipTest extends TestCase
         $this->page()->call('create')->set('kode', '710')->set('nama', '')->call('save')->assertSee('Isi nama kode arsip.');
         $this->page()->call('create')->set('kode', '710')->set('nama', str_repeat('a', 101))->call('save')->assertSee('Nama maksimal 100 karakter.');
         $this->assertSame(3, KodeArsip::count());
+    }
+
+    /** Review akhir 1.2: `$` also matches before a final newline; `\z` does not. */
+    public function test_trailing_newline_is_rejected(): void
+    {
+        try {
+            app(SaveKodeArsip::class)->handle(['kode' => "700\n", 'nama' => 'X']);
+            $this->fail('"700\n" must be rejected.');
+        } catch (ValidationException $e) {
+            $this->assertContains('Kode arsip hanya huruf, angka, dan titik.', $e->errors()['kode'] ?? []);
+        }
     }
 
     public function test_delete_of_used_kode_is_refused_with_toast(): void

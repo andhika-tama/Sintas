@@ -97,12 +97,13 @@ class PutuskanPerubahan
                 continue;
             }
             $item = PkptItem::findOrFail($op->pkpt_item_id);
-            $op->forceFill(['data_lama' => PerubahanPkpt::data($item)])->save();
+            // The mark is kept in the snapshot so dampak() still shows the flip once it is cleared below.
+            $op->forceFill(['data_lama' => PerubahanPkpt::data($item) + ['perubahan_penugasan_id' => $item->perubahan_penugasan_id]])->save();
             $item->fill($op->aksi === AksiPerubahan::Ubah
                 ? SavePkptItem::validated($pkpt, $op->data_baru)
                 : ['status' => StatusItemPkpt::Dihapus, 'dihapus_perubahan_id' => $p->id]);
-            if ($item->isDirty(['tanggal_mulai', 'tanggal_selesai'])) {
-                // 1.2 K10: an official date change replaces the Perubahan Penugasan, so its SPT can be sesuai again.
+            if ($item->isDirty(PerubahanPkpt::KOLOM_HAPUS_TANDA)) {
+                // 1.2 K10: an official date change (or a move to another irban) replaces the Perubahan Penugasan, so its SPT can be sesuai again.
                 $item->perubahan_penugasan_id = null;
             }
             $item->save();

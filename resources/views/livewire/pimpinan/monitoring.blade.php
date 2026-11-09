@@ -121,7 +121,7 @@
                             <tr wire:key="s-{{ $r['id'] }}-{{ $kunci }}" x-show="buka" @unless ($terbuka) x-cloak @endunless>
                                 <td class="min-w-48 !pl-10 before:absolute before:inset-y-0 before:left-6 before:w-0.5 before:bg-neutral-200">
                                     <a href="{{ $r['url'] }}" wire:navigate class="font-medium whitespace-nowrap text-mint-700 underline-offset-2 hover:underline">{{ $r['nomor_lengkap'] }}</a>
-                                    <span class="block text-xs text-neutral-600">{{ $r['jenis']['nama'] ?? 'Tanpa jenis penugasan' }} · {{ $r['irban'] }}</span>
+                                    <span class="block text-xs text-neutral-600 [overflow-wrap:anywhere]">{{ $r['jenis']['nama'] ?? 'Tanpa jenis penugasan' }} · {{ $r['irban'] }}</span>
                                 </td>
                                 <td class="min-w-28 text-neutral-600">{{ $p ?? '–' }}</td>
                                 <td class="min-w-32">{{ $r['mulai'] && $r['selesai'] ? Tanggal::rentang($r['mulai'], $r['selesai']) : '–' }}</td>
@@ -144,7 +144,7 @@
                                 @if ($g['jenis'])
                                     <x-app.type-chip :color="$g['jenis']['warna']" :label="$g['label']" class="font-semibold" />
                                 @else
-                                    <span class="block text-sm font-semibold text-neutral-900">{{ $g['label'] }}</span>
+                                    <span class="block text-sm font-semibold text-neutral-900 [overflow-wrap:anywhere]">{{ $g['label'] }}</span>
                                 @endif
                                 <span class="block text-sm text-neutral-600 tabular-nums">{{ collect([$p, $g['irban'], count($g['spt']).' SPT'])->filter()->implode(' · ') }}</span>
                             </span>

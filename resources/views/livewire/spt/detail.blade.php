@@ -4,6 +4,7 @@
      Action modals (Irban `laksanakan` only) are in the partial; `fokus-ke` (heard by the app layout's <main>) moves focus when a trigger is gone after an action. --}}
 @use('App\Support\Tanggal')
 @use('App\Enums\KejadianSpt')
+@use('App\Actions\Spt\SimpanSpt')
 @php
     $waktu = fn ($t) => $t->setTimezone('Asia/Jakarta')->translatedFormat('d F Y H.i').' WIB';
     $rentangTeks = $rentang ? Tanggal::rentang($rentang[0], $rentang[1]) : null;
@@ -79,7 +80,7 @@
                     <div class="{{ $baris }}"><dt class="text-neutral-600">Untuk</dt><dd class="whitespace-pre-line">{{ $spt->uraian_untuk ?: '—' }}</dd></div>
                     <div class="{{ $baris }}">
                         <dt class="text-neutral-600">Wilayah/Objek</dt>
-                        <dd>{{ implode(', ', $spt->namaObjek(true)) ?: '—' }}</dd>
+                        <dd class="[overflow-wrap:anywhere]">{{ implode(', ', $spt->namaObjek(true)) ?: '—' }}</dd>
                     </div>
                     <div class="{{ $baris }}"><dt class="text-neutral-600">Kode Arsip</dt><dd>{{ $spt->kodeArsip ? $spt->kodeArsip->kode.' · '.$spt->kodeArsip->nama : '—' }}</dd></div>
                     <div class="{{ $baris }}"><dt class="text-neutral-600">Periode diperiksa</dt><dd>{{ $spt->periode_diperiksa ?: '—' }}</dd></div>
@@ -106,13 +107,16 @@
                                 Sesuai jadwal PKPT ({{ $rentangTeks }})
                             @elseif ($sesuai === false && in_array('tidak_sesuai_pkpt', $penanda, true))
                                 <span class="inline-flex flex-wrap items-center gap-2"><x-app.flag jenis="tidak_sesuai_pkpt" /><span>({{ $rentangTeks }})</span></span>
+                            @elseif ($sesuai === false && $perubahanPenugasan)
+                                {{-- No flag before the number is issued (PenandaSpt, PRD 9.3); a marked item is never sesuai, whatever the dates (K6). --}}
+                                {{ SimpanSpt::ALASAN_PERUBAHAN_PENUGASAN }}
                             @elseif ($sesuai === false)
                                 {{-- No flag before the number is issued (PenandaSpt, PRD 9.3); the irban form words the same warning. --}}
                                 Di luar jadwal PKPT ({{ $rentangTeks }})
                             @else
                                 <span class="text-neutral-600">Tidak dinilai</span>
                             @endif
-                            @if ($sesuai === false && $perubahanPenugasan)
+                            @if ($sesuai === false && $perubahanPenugasan && in_array('tidak_sesuai_pkpt', $penanda, true))
                                 <p class="mt-1 text-neutral-600">Jadwal item ini diubah lewat Perubahan Penugasan (disetujui {{ $perubahanPenugasan->diputuskan_pada?->timezone('Asia/Jakarta')->translatedFormat('d F Y') }}).</p>
                             @endif
                         </dd>

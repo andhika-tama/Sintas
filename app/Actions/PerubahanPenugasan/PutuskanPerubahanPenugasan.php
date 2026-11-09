@@ -24,6 +24,8 @@ class PutuskanPerubahanPenugasan
 
     public const ITEM_BASI = 'Item PKPT ini sudah dihapus atau dipindahkan oleh Perubahan PKPT.';
 
+    public const JADWAL_SAMA = 'Jadwal baru sudah sama dengan jadwal PKPT; tolak pengajuan ini.';
+
     public function __construct(private PenerimaNotifikasi $penerima) {}
 
     public function handle(User $user, PerubahanPenugasan $p, bool $setuju, ?string $catatan): PerubahanPenugasan
@@ -45,6 +47,10 @@ class PutuskanPerubahanPenugasan
             // Only approval needs the item: a rejection stays possible, or the request would sit Diajukan forever.
             if ($setuju && ($item?->status !== StatusItemPkpt::Aktif || $item->irban_id !== $p->irban_id)) {
                 throw ValidationException::withMessages(['perubahan' => self::ITEM_BASI]);
+            }
+            // An official Perubahan PKPT gave the item these dates meanwhile: approving would mark SPT that are sesuai.
+            if ($setuju && $item->tanggal_mulai->equalTo($p->tanggal_mulai) && $item->tanggal_selesai->equalTo($p->tanggal_selesai)) {
+                throw ValidationException::withMessages(['perubahan' => self::JADWAL_SAMA]);
             }
 
             $p->forceFill([

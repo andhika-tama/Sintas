@@ -23,14 +23,18 @@ return new class extends Migration
     }
 
     /**
-     * Open `geser` usulan of aktif items, the newest per item, and only where the item has no Diajukan request yet (R2: one per item).
+     * Open `geser` usulan of aktif items of the same irban whose dates differ from the item's, the newest per item, and only where the item has no Diajukan request yet (R2: one per item).
      * Same item, irban, dates, alasan, diajukan_oleh, diinput_oleh and timestamps.
      */
     private function pindahkan(): void
     {
         DB::table('pkpt_usulan')->where('aksi_usulan', 'geser')->where('status', 'terbuka')
             ->whereNotNull('tanggal_mulai')->whereNotNull('tanggal_selesai')
-            ->whereIn('pkpt_item_id', DB::table('pkpt_item')->where('status', 'aktif')->select('id'))
+            // Still this irban's aktif item and not already on these dates, or the request would be dead on arrival (approval refuses both).
+            // DATE(): SQLite stores Eloquent date casts as 'Y-m-d H:i:s'; MySQL/MariaDB date columns compare the same either way.
+            ->whereExists(fn ($q) => $q->from('pkpt_item')->whereColumn('pkpt_item.id', 'pkpt_usulan.pkpt_item_id')
+                ->whereColumn('pkpt_item.irban_id', 'pkpt_usulan.irban_id')->where('pkpt_item.status', 'aktif')
+                ->whereRaw('NOT (DATE(pkpt_item.tanggal_mulai) = DATE(pkpt_usulan.tanggal_mulai) AND DATE(pkpt_item.tanggal_selesai) = DATE(pkpt_usulan.tanggal_selesai))'))
             ->whereNotIn('pkpt_item_id', DB::table('perubahan_penugasan')->where('status', 'diajukan')->select('pkpt_item_id'))
             ->orderByDesc('id')->get()->unique('pkpt_item_id')->sortBy('id')
             ->each(fn ($u) => DB::table('perubahan_penugasan')->insert([

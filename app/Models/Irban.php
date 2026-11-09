@@ -32,6 +32,6 @@ class Irban extends Model
     {
         return User::where('irban_id', $this->id)->exists() || $this->tahunan()->exists() || Tim::where('irban_id', $this->id)->exists()
             || IrbanWilayah::where('irban_id', $this->id)->exists() || PkptItem::where('irban_id', $this->id)->exists()
-            || Spt::where('irban_id', $this->id)->exists();
+            || Spt::where('irban_id', $this->id)->exists() || PerubahanPenugasan::where('irban_id', $this->id)->exists();
     }
 }

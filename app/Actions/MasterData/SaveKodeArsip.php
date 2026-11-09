@@ -12,7 +12,7 @@ class SaveKodeArsip
     public static function rules(?int $ignoreId = null): array
     {
         return [
-            'kode' => ['required', 'string', 'max:20', 'regex:/^[0-9A-Za-z.]+$/', Rule::unique('kode_arsip', 'kode')->ignore($ignoreId)],
+            'kode' => ['required', 'string', 'max:20', 'regex:/^[0-9A-Za-z.]+\z/', Rule::unique('kode_arsip', 'kode')->ignore($ignoreId)],
             'nama' => ['required', 'string', 'max:100'],
         ];
     }

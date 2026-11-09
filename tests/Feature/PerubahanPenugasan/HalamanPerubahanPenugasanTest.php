@@ -7,6 +7,7 @@ use App\Actions\PerubahanPenugasan\PutuskanPerubahanPenugasan;
 use App\Enums\Role;
 use App\Enums\StatusItemPkpt;
 use App\Enums\StatusPerubahanPenugasan;
+use App\Livewire\BagianUmum\Pengajuan as KotakMasuk;
 use App\Livewire\Irban\Pkpt as HalamanIrban;
 use App\Livewire\Irban\SptForm;
 use App\Livewire\Pimpinan\PerubahanPenugasan as HalamanPimpinan;
@@ -259,5 +260,31 @@ class HalamanPerubahanPenugasanTest extends TestCase
 
         $this->a->forceFill(['perubahan_penugasan_id' => null])->save();
         $this->actingAs($this->pimpinan)->get('/spt/'.$spt->id)->assertOk()->assertDontSee('diubah lewat Perubahan Penugasan');
+    }
+
+    /** Review akhir, Important 3: an approval refused because the item already has the requested dates is a toast and focuses the h1. */
+    public function test_setujui_jadwal_sama_is_a_toast(): void
+    {
+        $p = $this->ajukan();
+        $h = $this->pimpinanPage()->call('bukaSetujui', $p->id);
+        $this->a->update(['tanggal_mulai' => '2026-04-06', 'tanggal_selesai' => '2026-04-24']);
+
+        $h->call('setujui')->assertSet('setujuiOpen', false)
+            ->assertDispatched('toast', type: 'error', message: 'Jadwal baru sudah sama dengan jadwal PKPT; tolak pengajuan ini.')
+            ->assertDispatched('fokus-ke', id: 'judul-perubahan-penugasan');
+        $this->assertSame(StatusPerubahanPenugasan::Diajukan, $p->fresh()->status);
+    }
+
+    /** Review akhir, Important 4: before a number is issued, a marked item gives the Perubahan Penugasan reason, not "Di luar jadwal PKPT". */
+    public function test_reason_before_number_for_marked_item(): void
+    {
+        app(PutuskanPerubahanPenugasan::class)->handle($this->pimpinan, $this->ajukan(), true, null);
+        $spt = Spt::factory()->menungguNomor()->create(['irban_id' => $this->irban1->id, 'pkpt_item_id' => $this->a->id,
+            'jenis_penugasan_id' => $this->a->jenis_penugasan_id, 'tanggal_mulai' => '2026-03-03', 'tanggal_selesai' => '2026-03-05']);
+        $pesan = 'Jadwal item ini diubah lewat Perubahan Penugasan. SPT akan ditandai Tidak Sesuai PKPT.';
+
+        Livewire::actingAs(User::factory()->bagianUmum()->create())->test(KotakMasuk::class)->call('pilihSpt', $spt->id)
+            ->assertSee($pesan)->assertDontSee('Di luar jadwal PKPT');
+        $this->actingAs($this->pimpinan)->get('/spt/'.$spt->id)->assertOk()->assertSee($pesan)->assertDontSee('Di luar jadwal PKPT');
     }
 }

@@ -1,6 +1,7 @@
 {{-- Detail pane of the Kotak Masuk ($spt, eager-loaded): header, summary <dl> (GOV.UK summary list, _shared.md §7), personel in order, riwayat,
      sticky action bar for menunggu_nomor. Expects $spt. --}}
 @use('App\Support\Tanggal')
+@use('App\Actions\Spt\SimpanSpt')
 @use('App\Enums\StatusPengajuan')
 @php
     $item = $spt->pkptItem;
@@ -58,7 +59,7 @@
                     <p class="font-medium">{{ $item->jenisPenugasan->nama }} · PKPT {{ $item->pkpt->tahun }}@if ($item->pkpt->isDraf()) (Draf)@endif</p>
                     <x-app.jadwal-berlaku :item="$item" :mulai="$rentang[0]" :selesai="$rentang[1]" />
                     @unless ($sesuai)
-                        <p class="mt-1 text-neutral-600">Di luar jadwal PKPT ({{ Tanggal::rentang($rentang[0], $rentang[1]) }}). SPT akan ditandai Tidak Sesuai PKPT.</p>
+                        <p class="mt-1 text-neutral-600">{{ $item->perubahan_penugasan_id ? SimpanSpt::ALASAN_PERUBAHAN_PENUGASAN : 'Di luar jadwal PKPT ('.Tanggal::rentang($rentang[0], $rentang[1]).'). SPT akan ditandai Tidak Sesuai PKPT.' }}</p>
                     @endunless
                 @else
                     <p class="text-neutral-600">Non-PKPT (tanpa item PKPT)</p>
@@ -71,7 +72,7 @@
         </div>
         <div class="{{ $baris }}">
             <dt class="text-neutral-600">Objek</dt>
-            <dd>{{ implode(', ', $spt->namaObjek(true)) ?: '—' }}</dd>
+            <dd class="[overflow-wrap:anywhere]">{{ implode(', ', $spt->namaObjek(true)) ?: '—' }}</dd>
         </div>
         <div class="{{ $baris }}"><dt class="text-neutral-600">Periode diperiksa</dt><dd>{{ $spt->periode_diperiksa ?: '—' }}</dd></div>
         <div class="{{ $baris }}"><dt class="text-neutral-600">Untuk</dt><dd class="whitespace-pre-line">{{ $spt->uraian_untuk ?: '—' }}</dd></div>

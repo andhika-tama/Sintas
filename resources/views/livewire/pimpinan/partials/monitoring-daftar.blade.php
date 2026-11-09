@@ -12,7 +12,7 @@
         <tr wire:key="r-{{ $r['id'] }}-{{ $kunci }}">
             <td class="min-w-48">
                 <a href="{{ $r['url'] }}" wire:navigate class="font-medium whitespace-nowrap text-mint-700 underline-offset-2 hover:underline">{{ $r['nomor_lengkap'] }}</a>
-                <span class="block text-xs text-neutral-600">{{ $r['jenis']['nama'] ?? 'Tanpa jenis penugasan' }} · {{ $r['irban'] }}</span>
+                <span class="block text-xs text-neutral-600 [overflow-wrap:anywhere]">{{ $r['jenis']['nama'] ?? 'Tanpa jenis penugasan' }} · {{ $r['irban'] }}</span>
                 @if ($r['tanggal_spt'])
                     <span class="block text-xs text-neutral-600">Terbit {{ $r['tanggal_spt']->translatedFormat('d F Y') }}</span>
                 @endif
@@ -34,7 +34,7 @@
             </span>
             <p class="text-sm text-neutral-600 tabular-nums">{{ $r['mulai'] && $r['selesai'] ? Tanggal::rentang($r['mulai'], $r['selesai']) : '–' }}</p>
             <a href="{{ $r['url'] }}" wire:navigate class="inline-flex min-h-11 items-center text-sm font-medium [overflow-wrap:anywhere] text-mint-700 underline-offset-2 hover:underline">{{ $r['nomor_lengkap'] }}</a>
-            <p class="text-xs text-neutral-600">{{ $r['jenis']['nama'] ?? 'Tanpa jenis penugasan' }} · {{ $r['irban'] }}</p>
+            <p class="text-xs text-neutral-600 [overflow-wrap:anywhere]">{{ $r['jenis']['nama'] ?? 'Tanpa jenis penugasan' }} · {{ $r['irban'] }}</p>
             @if ($r['tanggal_spt'])
                 <p class="text-xs text-neutral-600">Terbit {{ $r['tanggal_spt']->translatedFormat('d F Y') }}</p>
             @endif

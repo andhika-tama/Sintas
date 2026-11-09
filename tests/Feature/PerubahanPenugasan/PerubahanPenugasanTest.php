@@ -18,11 +18,13 @@ use App\Models\Pegawai;
 use App\Models\PerubahanPenugasan;
 use App\Models\Pkpt;
 use App\Models\PkptItem;
+use App\Models\PkptPerubahan;
 use App\Models\Spt;
 use App\Models\User;
 use App\Notifications\PerubahanPenugasanDiajukan;
 use App\Notifications\PerubahanPenugasanDiputuskan;
 use App\Services\PenandaSpt;
+use App\Services\PerubahanPkpt;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -102,6 +104,15 @@ class PerubahanPenugasanTest extends TestCase
             return;
         }
         $this->fail("Expected a validation error on {$key}.");
+    }
+
+    /** An official Perubahan PKPT with one `ubah` operation on item a, submitted (not yet decided). */
+    private function paketUbah(array $op): PkptPerubahan
+    {
+        $p = app(BuatPerubahan::class)->handle($this->admin, $this->pkpt, ['jenis' => 'perubahan', 'alasan' => 'Menyesuaikan jadwal.']);
+        app(SimpanOperasi::class)->handle($this->admin, $p, null, ['aksi' => 'ubah', 'pkpt_item_id' => $this->a->id] + $op);
+
+        return app(AjukanPerubahan::class)->handle($this->admin, $p);
     }
 
     private function sptDiterima(string $mulai, string $selesai): Spt
@@ -329,5 +340,58 @@ class PerubahanPenugasanTest extends TestCase
         $this->assertSame(['Perubahan Penugasan disetujui: 6–24 April 2026. SPT ini akan ditandai Tidak Sesuai PKPT dan wajib diisi Kendala.'],
             $simpan->peringatan($data, $this->irban1->id));
         $this->assertSame([], $simpan->peringatan($data, $this->irban2->id));
+    }
+
+    /** Review akhir, Important 1: the impact list reads the mark, before and after approval. */
+    public function test_dampak_mengikuti_tanda_perubahan_penugasan(): void
+    {
+        $this->putuskan($this->ajukan(), true);
+        $spt = $this->sptDiterima('2026-03-04', '2026-03-06'); // inside the item's own range: Tidak Sesuai only by the mark
+        $aturan = app(PerubahanPkpt::class);
+
+        // Keterangan only: the mark stays, so the SPT stays Tidak Sesuai (no flip).
+        $p = $this->paketUbah(['keterangan' => 'Catatan baru']);
+        $this->assertSame([], $aturan->dampak($p)['spt']);
+        $p = app(PutuskanPerubahan::class)->handle($this->pimpinan, $p, true, null);
+        $this->assertNotNull($this->a->fresh()->perubahan_penugasan_id);
+        $this->assertSame([], $aturan->dampak($p)['spt']);
+
+        // New dates that still cover the SPT: the mark goes, so the SPT becomes sesuai.
+        $p = $this->paketUbah(['tanggal_mulai' => '2026-03-02', 'tanggal_selesai' => '2026-03-21']);
+        $flip = [['id' => $spt->id, 'nomor_lengkap' => $spt->nomor_lengkap, 'irban' => 'Irban I', 'sebelum' => false, 'sesudah' => true]];
+        $this->assertSame($flip, $aturan->dampak($p)['spt']);
+        $p = app(PutuskanPerubahan::class)->handle($this->pimpinan, $p, true, null);
+        $this->assertNull($this->a->fresh()->perubahan_penugasan_id);
+        $this->assertSame($flip, $aturan->dampak($p)['spt']);
+    }
+
+    /** Review akhir, Important 2: an official move clears the mark, and the old irban's open request does not block the new irban. */
+    public function test_pindah_irban_resmi_menghapus_tanda_dan_irban_baru_boleh_mengajukan(): void
+    {
+        $this->putuskan($this->ajukan(), true);
+        $lama = $this->ajukan(data: ['tanggal_mulai' => '2026-05-04', 'tanggal_selesai' => '2026-05-08']);
+
+        app(PutuskanPerubahan::class)->handle($this->pimpinan, $this->paketUbah(['irban_id' => $this->irban2->id]), true, null);
+        $a = $this->a->fresh();
+        $this->assertSame([$this->irban2->id, null], [$a->irban_id, $a->perubahan_penugasan_id]);
+
+        $ppj = Pegawai::factory()->create();
+        IrbanTahunan::factory()->create(['irban_id' => $this->irban2->id, 'tahun' => 2026, 'ppj_pegawai_id' => $ppj->id]);
+        $baru = app(AjukanPerubahanPenugasan::class)->handle($this->irbanLain, $a, [
+            'tanggal_mulai' => '2026-06-01', 'tanggal_selesai' => '2026-06-05', 'alasan' => 'Jadwal irban baru.', 'diinput_oleh' => $ppj->id]);
+        $this->assertSame([$this->irban2->id, StatusPerubahanPenugasan::Diajukan], [$baru->irban_id, $baru->status]);
+        $this->assertSame(StatusPerubahanPenugasan::Diajukan, $lama->fresh()->status);
+    }
+
+    /** Review akhir, Important 3: approval refuses a request whose dates the item already has; rejection stays allowed. */
+    public function test_setujui_ditolak_bila_jadwal_sudah_sama(): void
+    {
+        $p = $this->ajukan();
+        $this->a->forceFill(['tanggal_mulai' => '2026-04-06', 'tanggal_selesai' => '2026-04-24'])->save();
+
+        $this->galat(fn () => $this->putuskan($p, true), 'perubahan', 'Jadwal baru sudah sama dengan jadwal PKPT; tolak pengajuan ini.');
+        $this->assertSame(StatusPerubahanPenugasan::Diajukan, $p->fresh()->status);
+        $this->assertNull($this->a->fresh()->perubahan_penugasan_id);
+        $this->assertSame(StatusPerubahanPenugasan::Ditolak, $this->putuskan($p, false, 'Jadwal sudah sama.')->status);
     }
 }

@@ -39,6 +39,9 @@ class PerubahanPkpt
 
     public const KOLOM = ['irban_id', 'jenis_penugasan_id', 'tanggal_mulai', 'tanggal_selesai', 'keterangan', 'target_spt'];
 
+    /** 1.2 K10: an approved change of any of these columns clears the item's Perubahan Penugasan mark (PutuskanPerubahan and dampak()). */
+    public const KOLOM_HAPUS_TANDA = ['tanggal_mulai', 'tanggal_selesai', 'irban_id'];
+
     public function __construct(private KesesuaianPkpt $kesesuaian) {}
 
     /** @return list<string> Reasons the package cannot be submitted/applied now; empty = valid. */
@@ -151,10 +154,12 @@ class PerubahanPkpt
             ->whereIn('pkpt_item_id', $ubah->keys())->whereNotNull('tanggal_mulai')->whereNotNull('tanggal_selesai')->orderBy('id')->get();
         foreach ($daftar as $s) {
             $op = $ubah[$s->pkpt_item_id];
-            // After approval the item already holds the new dates: compare against data_lama instead.
-            $lama = $op->data_lama ? [$op->data_lama['tanggal_mulai'], $op->data_lama['tanggal_selesai']] : $this->kesesuaian->rentang($op->item);
-            $sebelum = $this->kesesuaian->sesuaiRentang($lama, $s->tanggal_mulai, $s->tanggal_selesai);
-            $sesudah = $this->kesesuaian->sesuaiRentang([$op->data_baru['tanggal_mulai'], $op->data_baru['tanggal_selesai']], $s->tanggal_mulai, $s->tanggal_selesai);
+            // After approval the item already holds the new values and no mark: read data_lama instead (rows approved before 1.2 have no mark key).
+            $lama = $op->data_lama ?? self::data($op->item);
+            $tanda = $op->data_lama ? ($op->data_lama['perubahan_penugasan_id'] ?? null) : $op->item->perubahan_penugasan_id;
+            $tetapBertanda = $tanda !== null && collect(self::KOLOM_HAPUS_TANDA)->every(fn ($k) => ($lama[$k] ?? null) === ($op->data_baru[$k] ?? null));
+            $sebelum = $tanda === null && $this->kesesuaian->sesuaiRentang([$lama['tanggal_mulai'], $lama['tanggal_selesai']], $s->tanggal_mulai, $s->tanggal_selesai);
+            $sesudah = ! $tetapBertanda && $this->kesesuaian->sesuaiRentang([$op->data_baru['tanggal_mulai'], $op->data_baru['tanggal_selesai']], $s->tanggal_mulai, $s->tanggal_selesai);
             if ($sebelum !== $sesudah) {
                 $spt[] = ['id' => $s->id, 'nomor_lengkap' => $s->nomor_lengkap, 'irban' => (string) $s->irban?->nama, 'sebelum' => $sebelum, 'sesudah' => $sesudah];
             }

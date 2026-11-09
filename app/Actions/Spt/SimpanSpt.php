@@ -51,6 +51,9 @@ class SimpanSpt
 
     public const ITEM_TIDAK_VALID = 'Item PKPT tidak valid untuk Irban ini.';
 
+    /** Reason line of an SPT on a marked item before its number is issued (BU detail, SPT detail); the form's peringatan() adds the dates and Kendala. */
+    public const ALASAN_PERUBAHAN_PENUGASAN = 'Jadwal item ini diubah lewat Perubahan Penugasan. SPT akan ditandai Tidak Sesuai PKPT.';
+
     /** @var list<string> */
     public array $peringatan = [];
 

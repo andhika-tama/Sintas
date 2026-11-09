@@ -7,6 +7,7 @@ use App\Livewire\Admin\Irban as Page;
 use App\Models\Irban;
 use App\Models\IrbanTahunan;
 use App\Models\Pegawai;
+use App\Models\PerubahanPenugasan;
 use App\Models\User;
 use Database\Seeders\DatabaseSeeder;
 use Database\Seeders\IrbanSeeder;
@@ -106,6 +107,16 @@ class IrbanTest extends TestCase
             $this->page()->call('confirmDelete', $o->id)->call('delete')->assertDispatched('toast', type: 'error');
             $this->assertModelExists($o);
         }
+    }
+
+    /** Review akhir 1.2: a Perubahan Penugasan keeps its irban after the item moves away; deleting that irban is a toast, not a FK 500. */
+    public function test_delete_blocked_when_perubahan_penugasan_references(): void
+    {
+        $o = Irban::factory()->create();
+        PerubahanPenugasan::factory()->create(['irban_id' => $o->id]); // the item belongs to another irban
+        $this->assertTrue($o->isReferenced());
+        $this->page()->call('confirmDelete', $o->id)->call('delete')->assertDispatched('toast', type: 'error');
+        $this->assertModelExists($o);
     }
 
     public function test_every_action_rejects_demoted_admin(): void

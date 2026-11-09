@@ -201,7 +201,7 @@ class PerubahanPenugasanTest extends TestCase
         Notification::assertSentTo($this->irban, PerubahanPenugasanDiputuskan::class, function ($n) {
             $d = $n->toArray($this->irban);
 
-            return $d['jenis'] === 'perubahan_penugasan_disetujui' && $d['url'] === route('irban.pkpt', absolute: false);
+            return $d['jenis'] === 'perubahan_penugasan_disetujui' && $d['url'] === '/irban/pkpt?tahun=2026&tampilan=perubahan';
         });
         Notification::assertNotSentTo([$this->irbanLain, $this->admin], PerubahanPenugasanDiputuskan::class);
         $this->assertDatabaseHas('activity_log', ['subject_type' => PerubahanPenugasan::class, 'subject_id' => $p->id, 'event' => 'updated']);
@@ -326,7 +326,7 @@ class PerubahanPenugasanTest extends TestCase
         $this->assertSame([], $simpan->peringatan($data, $this->irban1->id));
 
         $this->putuskan($this->ajukan(), true);
-        $this->assertSame(['Jadwal item ini diubah lewat Perubahan Penugasan. SPT akan ditandai Tidak Sesuai PKPT.'],
+        $this->assertSame(['Perubahan Penugasan disetujui: 6–24 April 2026. SPT ini akan ditandai Tidak Sesuai PKPT dan wajib diisi Kendala.'],
             $simpan->peringatan($data, $this->irban1->id));
         $this->assertSame([], $simpan->peringatan($data, $this->irban2->id));
     }

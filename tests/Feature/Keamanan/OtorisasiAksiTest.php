@@ -248,7 +248,7 @@ class OtorisasiAksiTest extends TestCase
     public function test_halaman_irban_ditolak_untuk_peran_lain(): void
     {
         Pkpt::factory()->disahkan()->create(['tahun' => (int) now('Asia/Jakarta')->year]);
-        foreach ([[IrbanPkpt::class, ['kirimUsulan']], [IrbanPkpt::class, ['bukaUsulan']], [SptSaya::class, ['$refresh']], [IrbanDasbor::class, ['$refresh']]] as [$kelas, $p]) {
+        foreach ([[IrbanPkpt::class, ['kirimPerubahan']], [IrbanPkpt::class, ['bukaPerubahan', 1]], [SptSaya::class, ['$refresh']], [IrbanDasbor::class, ['$refresh']]] as [$kelas, $p]) {
             $this->putar($this->irban, $this->pimpinan, $kelas)->call(...$p)->assertForbidden();
         }
     }

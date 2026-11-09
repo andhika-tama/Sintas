@@ -1,7 +1,7 @@
 {{-- PKPT calendar in the Sistem B grid (spec Tugas B.3): legend, then month blocks × Minggu 1–5 (MingguPkpt, from KalenderPkpt::untuk).
      ≥1280 two blocks per row, 768–1279 one per row (5 columns kept; 2 columns at 1024 leave ~40px cells beside the sidebar), <768 accordion month cards with vertical week sections.
      A card opens the item detail: popover ≥768, x-ui.drawer bottom sheet <768 (Alpine `kalenderPkpt`, resources/js/kalender.js).
-     `aksi`: Livewire method of the host page called with the item id for "Usulkan Perubahan" (null = read-only).
+     `aksi`: Livewire method of the host page called with the item id for "Ajukan Perubahan Penugasan" (null = read-only).
      `riwayat`: PerubahanPkpt::riwayatItemUntuk() keyed by item id, shown in the detail (x-app.riwayat-perubahan).
      `id`: prefix of every DOM id, so two calendars on one page do not collide.
      No animation (DESIGN §7.5) apart from the drawer's own transition; the accordion and popover switch instantly. --}}

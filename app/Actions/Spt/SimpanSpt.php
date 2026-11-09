@@ -159,7 +159,7 @@ class SimpanSpt
      */
     public function peringatan(array $data, int $irbanId): array
     {
-        $item = PkptItem::aktif()->with('pkpt')->where('irban_id', $irbanId)->find($this->int($data['pkpt_item_id'] ?? null));
+        $item = PkptItem::aktif()->with(['pkpt', 'perubahanPenugasan'])->where('irban_id', $irbanId)->find($this->int($data['pkpt_item_id'] ?? null));
         if (! $item) {
             return [];
         }
@@ -169,8 +169,8 @@ class SimpanSpt
         }
         $mulai = $this->tanggal($data['tanggal_mulai'] ?? null);
         $selesai = $this->tanggal($data['tanggal_selesai'] ?? null);
-        if ($item->perubahan_penugasan_id !== null) {
-            $w[] = 'Jadwal item ini diubah lewat Perubahan Penugasan. SPT akan ditandai Tidak Sesuai PKPT.';
+        if ($p = $item->perubahanPenugasan) {
+            $w[] = 'Perubahan Penugasan disetujui: '.Tanggal::rentang($p->tanggal_mulai, $p->tanggal_selesai).'. SPT ini akan ditandai Tidak Sesuai PKPT dan wajib diisi Kendala.';
         } elseif ($mulai && $selesai && ! $this->kesesuaian->sesuai($item, $mulai, $selesai)) {
             [$m, $s] = $this->kesesuaian->rentang($item);
             $w[] = 'Di luar jadwal PKPT ('.Tanggal::rentang($m, $s).'). SPT akan ditandai Tidak Sesuai PKPT.';

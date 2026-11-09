@@ -112,6 +112,9 @@
                             @else
                                 <span class="text-neutral-600">Tidak dinilai</span>
                             @endif
+                            @if ($sesuai === false && $perubahanPenugasan)
+                                <p class="mt-1 text-neutral-600">Jadwal item ini diubah lewat Perubahan Penugasan (disetujui {{ $perubahanPenugasan->diputuskan_pada?->timezone('Asia/Jakarta')->translatedFormat('d F Y') }}).</p>
+                            @endif
                         </dd>
                     </div>
                     <div class="{{ $baris }}"><dt class="text-neutral-600">PPJ</dt><dd>{{ $spt->ppj?->nama_bergelar ?? '—' }}</dd></div>

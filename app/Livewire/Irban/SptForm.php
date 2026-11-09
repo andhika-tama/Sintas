@@ -155,7 +155,12 @@ class SptForm extends Component
             $this->pkpt_item_id = null; // SimpanSpt reads "no item" as Non-PKPT.
         }
         if ($prop === 'pkpt_item_id' && $this->pkpt_item_id) {
-            $this->jenis_penugasan_id = $this->item()?->jenis_penugasan_id;
+            $item = $this->item();
+            $this->jenis_penugasan_id = $item?->jenis_penugasan_id;
+            // 1.2 K6: a marked item's approved schedule is the likely realization; only empty dates are filled.
+            if (($p = $item?->perubahanPenugasan) && $this->tanggal_mulai === '' && $this->tanggal_selesai === '') {
+                [$this->tanggal_mulai, $this->tanggal_selesai] = [$p->tanggal_mulai->toDateString(), $p->tanggal_selesai->toDateString()];
+            }
             $this->jenis_penugasan_lainnya = $this->objek_lainnya = ''; // SimpanSpt drops them anyway once an item is linked
         }
         if (in_array(explode('.', $prop)[0], self::SARAN, true) && ($this->uraian_untuk === '' || $this->uraian_untuk === $this->saranTerpakai)) {

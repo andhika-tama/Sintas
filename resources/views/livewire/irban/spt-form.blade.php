@@ -12,6 +12,7 @@
     $wajib = (bool) $klasifikasi?->wajib_item_pkpt;
     $pkptDraf = in_array('PKPT belum disahkan.', $peringatan, true);
     $diLuar = collect($peringatan)->first(fn ($w) => str_starts_with($w, 'Di luar jadwal PKPT'));
+    $ditandai = collect($peringatan)->first(fn ($w) => str_starts_with($w, 'Perubahan Penugasan disetujui'));
     $section = 'border-t border-neutral-200 pt-6';
     $h3 = 'mb-4 text-lg font-semibold text-neutral-900';
     $iconBtn = 'inline-flex size-11 shrink-0 items-center justify-center rounded-md text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 aria-disabled:text-neutral-400 aria-disabled:hover:bg-transparent lg:size-8';
@@ -106,6 +107,9 @@
                         </div>
                         @if ($pkptDraf)
                             <x-ui.alert variant="warning" class="mt-2">PKPT belum disahkan.</x-ui.alert>
+                        @endif
+                        @if ($ditandai)
+                            <x-ui.alert variant="warning" class="mt-2">{{ $ditandai }}</x-ui.alert>
                         @endif
                     @endif
                 @endunless

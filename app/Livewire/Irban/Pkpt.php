@@ -2,14 +2,12 @@
 
 namespace App\Livewire\Irban;
 
-use App\Actions\Pkpt\Usulan\AjukanUsulan;
-use App\Enums\AksiUsulan;
+use App\Actions\PerubahanPenugasan\AjukanPerubahanPenugasan;
 use App\Enums\Role;
 use App\Enums\StatusPkpt;
-use App\Models\JenisPenugasan;
+use App\Models\PerubahanPenugasan;
 use App\Models\Pkpt as PkptModel;
 use App\Models\PkptItem;
-use App\Models\PkptUsulan;
 use App\Models\User;
 use App\Services\KalenderPkpt;
 use App\Services\KesesuaianPkpt;
@@ -23,36 +21,33 @@ use Livewire\Attributes\Url;
 use Livewire\Component;
 
 /**
- * Irban "Jadwal PKPT": the own irban's active items of a Disahkan PKPT (calendar or table), riwayat per item, the "Usulkan Perubahan" /
- * "Usulkan item baru" modal and the "Usulan saya" list. Rules live in AjukanUsulan; every lookup is scoped to the user's irban.
+ * Irban "Jadwal PKPT": the own irban's active items of a Disahkan PKPT (calendar or table, always the original PKPT dates, K12), riwayat per
+ * item, the "Ajukan Perubahan Penugasan" modal (1.2 K5/K7) and the "Perubahan Penugasan Saya" list. Rules live in AjukanPerubahanPenugasan;
+ * every item id goes through its irban-scoped itemSendiri() before the action, so a foreign id is a 404 like a missing one.
  */
 #[Title('Jadwal PKPT')]
 class Pkpt extends Component
 {
-    private const FIELDS = ['aksi_usulan', 'tanggal_mulai', 'tanggal_selesai', 'jenis_penugasan_id', 'alasan', 'diinput_oleh'];
+    private const FIELDS = ['tanggal_mulai', 'tanggal_selesai', 'alasan', 'diinput_oleh'];
 
-    private const TAMPILAN = ['kalender', 'tabel', 'usulan'];
+    private const TAMPILAN = ['kalender', 'tabel', 'perubahan'];
 
     #[Url]
     public string $tahun = '';
 
-    /** kalender | tabel | usulan; anything else falls back to kalender. */
+    /** kalender | tabel | perubahan; anything else falls back to kalender. */
     #[Url]
     public string $tampilan = 'kalender';
 
-    public bool $usulanOpen = false;
+    public bool $perubahanOpen = false;
 
-    /** Item of the open modal; null = "Usulkan item baru". */
+    /** Item of the open modal. */
     #[Locked]
-    public ?int $usulanItemId = null;
-
-    public string $aksi_usulan = '';
+    public ?int $perubahanItemId = null;
 
     public string $tanggal_mulai = '';
 
     public string $tanggal_selesai = '';
-
-    public string $jenis_penugasan_id = '';
 
     public string $alasan = '';
 
@@ -67,32 +62,21 @@ class Pkpt extends Component
         $this->tahun = $this->tahun !== '' ? $this->tahun : (string) now('Asia/Jakarta')->year;
     }
 
-    /** Opens the modal for an own active item (404 otherwise) or, with null, for a new item of the year's Disahkan PKPT. */
-    public function bukaUsulan(?int $id = null): void
+    /** Opens the modal for an own active item (404 for a foreign or missing id), prefilled with the PKPT dates. */
+    public function bukaPerubahan(int $id): void
     {
         $user = $this->irban();
         $this->resetValidation();
-        $this->reset('tanggal_mulai', 'tanggal_selesai', 'jenis_penugasan_id', 'alasan');
-        if ($id !== null) {
-            if (! $item = $this->item($id)) {
-                return;
-            }
-            $this->usulanItemId = $item->id;
-            $this->aksi_usulan = AksiUsulan::Geser->value;
-            $this->tanggal_mulai = $item->tanggal_mulai->toDateString();
-            $this->tanggal_selesai = $item->tanggal_selesai->toDateString();
-        } else {
-            if (! $this->pkptDisahkan()) {
-                $this->dispatch('toast', type: 'error', message: 'Usulan perubahan hanya untuk PKPT yang sudah disahkan.');
-
-                return;
-            }
-            $this->usulanItemId = null;
-            $this->aksi_usulan = AksiUsulan::Tambah->value;
+        $this->reset('alasan');
+        if (! $item = $this->item($id)) {
+            return;
         }
+        $this->perubahanItemId = $item->id;
+        $this->tanggal_mulai = $item->tanggal_mulai->toDateString();
+        $this->tanggal_selesai = $item->tanggal_selesai->toDateString();
         $this->diinput_oleh = DiinputOleh::terakhir($user);
         $this->ganti = false;
-        $this->usulanOpen = true;
+        $this->perubahanOpen = true;
     }
 
     public function gantiPenginput(): void
@@ -101,35 +85,32 @@ class Pkpt extends Component
         $this->ganti = true;
     }
 
-    public function kirimUsulan(AjukanUsulan $action): void
+    public function kirimPerubahan(AjukanPerubahanPenugasan $action): void
     {
         $user = $this->irban();
-        $item = $this->usulanItemId ? $this->item($this->usulanItemId) : null;
-        if ($this->usulanItemId && ! $item) {
+        if (! $this->perubahanItemId || ! $item = $this->item($this->perubahanItemId)) {
             return;
         }
-        $pkpt = $item?->pkpt ?? $this->pkptDisahkan() ?? PkptModel::where('tahun', (int) $this->tahun)->firstOrFail();
-        // The radio offers "Item baru" only without an item and the other kinds only with one.
-        $aksi = $item ? ($this->aksi_usulan === AksiUsulan::Tambah->value ? '' : $this->aksi_usulan) : AksiUsulan::Tambah->value;
         $this->resetValidation();
         try {
-            $action->handle($user, $pkpt, $item, ['aksi_usulan' => $aksi] + $this->only(array_slice(self::FIELDS, 1)));
+            $action->handle($user, $item, $this->only(self::FIELDS));
         } catch (ValidationException $e) {
             foreach ($e->errors() as $key => $messages) {
                 if (in_array($key, self::FIELDS, true)) {
                     $this->addError($key, $messages[0]);
                 } else {
-                    $this->usulanOpen = false;
+                    // `item` / `pkpt` have no field in the modal (pitfall "Galat non-kolom"): close it and show a toast.
+                    $this->perubahanOpen = false;
                     $this->dispatch('toast', type: 'error', message: $messages[0]);
-                    $this->dispatch('usulan-fokus', id: null);
+                    $this->dispatch('perubahan-fokus', id: null);
                 }
             }
 
             return;
         }
-        $this->usulanOpen = false;
-        $this->dispatch('usulan-fokus', id: $item?->id ?? 'baru');
-        $this->dispatch('toast', type: 'success', message: 'Usulan perubahan terkirim ke Admin.');
+        $this->perubahanOpen = false;
+        $this->dispatch('perubahan-fokus', id: $item->id);
+        $this->dispatch('toast', type: 'success', message: 'Perubahan Penugasan terkirim ke Pimpinan.');
     }
 
     /** Route middleware does not run on Livewire update requests, so every entry point checks the role. */
@@ -145,19 +126,14 @@ class Pkpt extends Component
     private function item(int $id): ?PkptItem
     {
         try {
-            return AjukanUsulan::itemSendiri($this->irban(), $id);
+            return AjukanPerubahanPenugasan::itemSendiri($this->irban(), $id);
         } catch (ValidationException $e) {
-            $this->usulanOpen = false;
-            $this->dispatch('toast', type: 'error', message: AjukanUsulan::ITEM_BASI);
-            $this->dispatch('usulan-fokus', id: null);
+            $this->perubahanOpen = false;
+            $this->dispatch('toast', type: 'error', message: collect($e->errors())->flatten()->first());
+            $this->dispatch('perubahan-fokus', id: null);
 
             return null;
         }
-    }
-
-    private function pkptDisahkan(): ?PkptModel
-    {
-        return PkptModel::where('tahun', (int) $this->tahun)->where('status', StatusPkpt::Disahkan->value)->first();
     }
 
     public function render(KesesuaianPkpt $kesesuaian, KalenderPkpt $kalender, WilayahPengawasan $wilayah, PerubahanPkpt $perubahan)
@@ -168,8 +144,8 @@ class Pkpt extends Component
         }
         $pkpt = PkptModel::where('tahun', (int) $this->tahun)->first();
         $disahkan = $pkpt?->status === StatusPkpt::Disahkan;
-        // Jenis and effective dates feed the table, the cards and the open usulan modal; the calendar gets them from KalenderPkpt.
-        $perluBaris = $this->tampilan === 'tabel' || $this->usulanOpen;
+        // Jenis and PKPT dates feed the table, the cards and the open modal; the calendar gets them from KalenderPkpt.
+        $perluBaris = $this->tampilan === 'tabel' || $this->perubahanOpen;
         $items = $disahkan
             ? $pkpt->items()->aktif()->where('irban_id', $user->irban_id)->when($perluBaris, fn ($q) => $q->with('jenisPenugasan'))
                 ->orderBy('tanggal_mulai')->orderBy('id')->get()
@@ -179,9 +155,9 @@ class Pkpt extends Component
             ->unique()->sortDesc()->mapWithKeys(fn ($t) => [$t => $t])->all();
 
         $pakaiKalender = $this->tampilan === 'kalender' && $items->isNotEmpty();
-        $usulan = $disahkan && $this->tampilan === 'usulan'
-            ? PkptUsulan::where('pkpt_id', $pkpt->id)->where('irban_id', $user->irban_id)
-                ->with(['item.jenisPenugasan', 'jenisPenugasan', 'perubahan:id,nomor_urut'])->latest()->orderByDesc('id')->get()
+        $daftar = $disahkan && $this->tampilan === 'perubahan'
+            ? PerubahanPenugasan::where('irban_id', $user->irban_id)->whereHas('item', fn ($q) => $q->where('pkpt_id', $pkpt->id))
+                ->with('item.jenisPenugasan')->latest()->orderByDesc('id')->get()
             : collect();
 
         return view('livewire.irban.pkpt', [
@@ -190,13 +166,12 @@ class Pkpt extends Component
             'pkpt' => $pkpt,
             'items' => $items,
             'rentang' => $rentang,
-            'riwayat' => $this->tampilan === 'usulan' ? [] : $perubahan->riwayatItemUntuk($user, $items->pluck('id')->all()),
-            'usulan' => $usulan,
+            'riwayat' => $this->tampilan === 'perubahan' ? [] : $perubahan->riwayatItemUntuk($user, $items->pluck('id')->all()),
+            'daftar' => $daftar,
             'tahunList' => $tahunList,
             'irbanNama' => $user->irban?->nama ?? 'irban ini',
-            'aktif' => $this->usulanOpen && $this->usulanItemId ? $items->firstWhere('id', $this->usulanItemId) : null,
-            'penginput' => $this->usulanOpen ? DiinputOleh::pilihan($user) : collect(),
-            'jenisOptions' => $this->usulanOpen && ! $this->usulanItemId ? JenisPenugasan::orderBy('nama')->pluck('nama', 'id')->all() : [],
+            'aktif' => $this->perubahanOpen && $this->perubahanItemId ? $items->firstWhere('id', $this->perubahanItemId) : null,
+            'penginput' => $this->perubahanOpen ? DiinputOleh::pilihan($user) : collect(),
         ]);
     }
 }

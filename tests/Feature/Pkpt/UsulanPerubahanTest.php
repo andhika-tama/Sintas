@@ -256,66 +256,25 @@ class UsulanPerubahanTest extends TestCase
         $p->operasi()->create(['aksi' => 'ubah', 'pkpt_item_id' => $this->c->id, 'urutan' => 1,
             'data_lama' => PerubahanPkpt::data($this->c), 'data_baru' => ['irban_id' => $this->irban2->id] + PerubahanPkpt::data($this->c)]);
 
-        // Modal opened, then the item is removed before sending.
-        $h = Livewire::actingAs($this->irban)->test(HalamanIrban::class, ['tampilan' => 'tabel'])->call('bukaUsulan', $this->b->id)->assertSet('usulanOpen', true)
-            ->set('aksi_usulan', 'hapus')->set('alasan', 'Item ini tidak perlu.')->set('diinput_oleh', $this->penginput->id);
+        // 1.2 Task 7: the Irban page no longer opens usulan; the action keeps its stale-item rule until Task 8 removes it.
         $this->b->update(['status' => StatusItemPkpt::Dihapus]);
-        $h->call('kirimUsulan')->assertStatus(200)->assertSet('usulanOpen', false)
-            ->assertDispatched('toast', type: 'error', message: AjukanUsulan::ITEM_BASI)->assertDispatched('usulan-fokus', id: null);
-
-        // Table loaded, then the item moved to another irban: opening shows the toast.
         $this->c->update(['irban_id' => $this->irban2->id]);
-        Livewire::actingAs($this->irban)->test(HalamanIrban::class)->call('bukaUsulan', $this->c->id)->assertStatus(200)
-            ->assertSet('usulanOpen', false)->assertDispatched('toast', type: 'error', message: AjukanUsulan::ITEM_BASI);
         $this->galat(fn () => $this->ajukan($this->c, ['aksi_usulan' => 'hapus']), 'item', AjukanUsulan::ITEM_BASI);
         $this->galat(fn () => $this->ajukan($this->b, ['aksi_usulan' => 'hapus']), 'item', AjukanUsulan::ITEM_BASI);
         $this->assertSame(0, PkptUsulan::count());
 
         // Never this irban's (even when dihapus or moved between other irbans): still a 404.
         $this->milikLain->update(['status' => StatusItemPkpt::Dihapus]);
-        Livewire::actingAs($this->irban)->test(HalamanIrban::class)->call('bukaUsulan', $this->milikLain->id)->assertNotFound();
+        $this->expectException(NotFoundHttpException::class);
+        $this->ajukan($this->milikLain, ['aksi_usulan' => 'hapus']);
     }
 
     public function test_scope_in_the_irban_page_and_non_irban_cannot_propose(): void
     {
-        Livewire::actingAs($this->irban)->test(HalamanIrban::class)->call('bukaUsulan', $this->milikLain->id)->assertNotFound();
         Livewire::actingAs($this->admin)->test(HalamanIrban::class)->assertForbidden();
 
         $this->expectException(AuthorizationException::class);
         app(AjukanUsulan::class)->handle($this->admin, $this->pkpt, null, ['aksi_usulan' => 'tambah']);
-    }
-
-    public function test_irban_page_modal_submits_and_usulan_saya_lists_only_own(): void
-    {
-        PkptUsulan::factory()->create(['pkpt_item_id' => $this->milikLain->id, 'alasan' => 'Alasan rahasia irban lain']);
-
-        Livewire::actingAs($this->irban)->test(HalamanIrban::class, ['tampilan' => 'tabel'])
-            ->call('bukaUsulan', $this->a->id)->assertSet('usulanOpen', true)->assertSet('aksi_usulan', 'geser')
-            ->assertSet('tanggal_mulai', '2026-03-02')->assertSee('Jenis usulan')->assertSee('Jadwal baru')
-            ->set('tanggal_mulai', '2026-03-09')->set('tanggal_selesai', '2026-03-27')->set('alasan', 'OPD minta mundur seminggu.')
-            ->call('kirimUsulan')->assertHasErrors('diinput_oleh')
-            ->set('diinput_oleh', $this->penginput->id)->call('kirimUsulan')
-            ->assertHasNoErrors()->assertSet('usulanOpen', false)->assertDispatched('usulan-fokus', id: $this->a->id);
-
-        Livewire::actingAs($this->irban)->test(HalamanIrban::class)
-            ->call('bukaUsulan')->assertSet('aksi_usulan', 'tambah')->assertSee('Usulkan item baru')
-            ->set('jenis_penugasan_id', (string) $this->jenis->id)->set('tanggal_mulai', '2026-10-05')->set('tanggal_selesai', '2026-10-16')
-            ->set('alasan', 'Permintaan audit tambahan.')->call('kirimUsulan')->assertHasNoErrors()->assertDispatched('usulan-fokus', id: 'baru');
-
-        $this->assertSame(2, PkptUsulan::where('irban_id', $this->irban1->id)->count());
-        Livewire::actingAs($this->irban)->test(HalamanIrban::class, ['tampilan' => 'usulan'])
-            ->assertSee('OPD minta mundur seminggu.')->assertSee('Permintaan audit tambahan.')->assertSee('Terbuka')
-            ->assertDontSee('Alasan rahasia irban lain');
-    }
-
-    public function test_usulan_saya_shows_catatan_and_perubahan_number(): void
-    {
-        $p = PkptPerubahan::factory()->disetujui(2)->create(['pkpt_id' => $this->pkpt->id]);
-        PkptUsulan::factory()->ditutup('Sudah tercakup item lain.')->create(['pkpt_item_id' => $this->a->id]);
-        PkptUsulan::factory()->create(['pkpt_item_id' => $this->b->id, 'status' => StatusUsulan::Diterapkan, 'perubahan_id' => $p->id]);
-
-        $this->actingAs($this->irban)->get('/irban/pkpt?tampilan=usulan')->assertOk()
-            ->assertSee('Usulan saya')->assertSee('Sudah tercakup item lain.')->assertSee('Ditutup')->assertSee('Perubahan ke-2')->assertSee('Diterapkan');
     }
 
     public function test_admin_panel_tampung_and_tutup_and_only_admin_may(): void

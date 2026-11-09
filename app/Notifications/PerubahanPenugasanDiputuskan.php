@@ -14,9 +14,12 @@ class PerubahanPenugasanDiputuskan extends NotifikasiSintas
 
     protected ?string $catatanPutusan;
 
+    protected ?int $tahun;
+
     public function __construct(PerubahanPenugasan $p)
     {
-        $p->loadMissing(['irban', 'item.jenisPenugasan']);
+        $p->loadMissing(['irban', 'item.jenisPenugasan', 'item.pkpt:id,tahun']);
+        $this->tahun = $p->item?->pkpt?->tahun;
         $this->disetujui = $p->status === StatusPerubahanPenugasan::Disetujui;
         $this->konteks = PerubahanPenugasanDiajukan::konteksPerubahan($p);
         $this->catatanPutusan = $p->catatan_putusan;
@@ -39,7 +42,8 @@ class PerubahanPenugasanDiputuskan extends NotifikasiSintas
 
     public function url(): string
     {
-        return route('irban.pkpt', absolute: false);
+        // 1.2 Task 7: straight to "Perubahan Penugasan Saya" of the item's PKPT year.
+        return route('irban.pkpt', array_filter(['tahun' => $this->tahun, 'tampilan' => 'perubahan']), false);
     }
 
     public function catatan(): ?string

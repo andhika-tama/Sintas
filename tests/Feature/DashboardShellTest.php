@@ -137,7 +137,7 @@ class DashboardShellTest extends TestCase
         }
         $this->assertSame(['Kotak Masuk Pengajuan', 'Register Nomor SPT'], array_column(Navigation::groups(Role::BagianUmum)[1]['items'], 'label'));
         $this->assertSame(['SPT Saya', 'Ajukan Nomor SPT', 'Jadwal PKPT', 'Rekap Saya'], array_column(Navigation::groups(Role::Irban)[1]['items'], 'label'));
-        $this->assertSame(['Monitoring SPT', 'Rekap Triwulanan', 'Perubahan PKPT', 'Log Aktivitas'], array_column(Navigation::groups(Role::Pimpinan)[1]['items'], 'label'));
+        $this->assertSame(['Monitoring SPT', 'Rekap Triwulanan', 'Perubahan PKPT', 'Perubahan Penugasan', 'Log Aktivitas'], array_column(Navigation::groups(Role::Pimpinan)[1]['items'], 'label'));
     }
 
     public function test_admin_dashboard_quick_links_come_from_navigation(): void

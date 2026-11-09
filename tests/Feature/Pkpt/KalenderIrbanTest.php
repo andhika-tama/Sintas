@@ -110,14 +110,14 @@ class KalenderIrbanTest extends TestCase
             ->assertDontSee('Kecamatan Milik Lain')->assertDontSee('Jenis Rahasia Irban Lain')->assertDontSee('Keterangan irban lain');
     }
 
-    /** Fase 9.2 Task 9: the old "Ajukan Revisi Jadwal" flow is replaced by "Usulkan Perubahan" in the calendar detail and the table. */
-    public function test_usulkan_perubahan_in_calendar_and_table(): void
+    /** 1.2 Task 7: "Ajukan Perubahan Penugasan" replaces "Usulkan Perubahan" in the calendar detail and the table; no "Usulkan item baru" (K7). */
+    public function test_ajukan_perubahan_penugasan_in_calendar_and_table(): void
     {
         $id = $this->item('2026-06-29')->id;
         foreach (['kalender', 'tabel'] as $tampilan) {
             $this->actingAs($this->user)->get('/irban/pkpt?tampilan='.$tampilan)->assertOk()
-                ->assertDontSee('Ajukan Revisi')->assertSee('Usulkan Perubahan')->assertSee('wire:click="bukaUsulan('.$id.')"', false)
-                ->assertSee('Usulkan item baru');
+                ->assertDontSee('Ajukan Revisi')->assertSee('Ajukan Perubahan Penugasan')->assertSee('wire:click="bukaPerubahan('.$id.')"', false)
+                ->assertDontSee('Usulkan');
         }
     }
 
@@ -150,8 +150,8 @@ class KalenderIrbanTest extends TestCase
         $id = $this->item('2026-06-29')->id;
         $html = $this->actingAs($this->user)->get('/irban/pkpt')->assertOk()->getContent();
 
-        $this->assertMatchesRegularExpression('/<button[^>]*data-kartu="'.$id.'"[^>]*data-usulan-pemicu="'.$id.'"/', $html);
-        $this->assertStringContainsString("[data-usulan-pemicu='\${id}']", $html);
+        $this->assertMatchesRegularExpression('/<button[^>]*data-kartu="'.$id.'"[^>]*data-perubahan-pemicu="'.$id.'"/', $html);
+        $this->assertStringContainsString("[data-perubahan-pemicu='\${id}']", $html);
         $this->assertStringNotContainsString("[data-kartu='\${id}']", $html);
     }
 

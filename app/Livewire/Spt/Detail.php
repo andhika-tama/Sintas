@@ -240,6 +240,8 @@ class Detail extends Component
             'perluKendala' => $penanda->perluKendala($spt),
             'rentang' => $item ? $kesesuaian->rentang($item) : null,
             'sesuai' => $item && $spt->tanggal_mulai && $spt->tanggal_selesai ? $kesesuaian->sesuai($item, $spt->tanggal_mulai, $spt->tanggal_selesai) : null,
+            // 1.2 K6: why a SPT inside the PKPT range is still Tidak Sesuai.
+            'perubahanPenugasan' => $item?->perubahanPenugasan,
             'hariKerja' => $settings->get('penugasan.hitungan_hari') === 'kerja',
             'laksanakan' => $laksanakan,
             'bisaUbah' => auth()->user()->can('update', $spt),

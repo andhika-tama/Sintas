@@ -42,6 +42,7 @@ use App\Livewire\LogAktivitas;
 use App\Livewire\Notifikasi\Daftar as NotifikasiDaftar;
 use App\Livewire\Pimpinan\Dasbor as PimpinanDasbor;
 use App\Livewire\Pimpinan\Monitoring;
+use App\Livewire\Pimpinan\PerubahanPenugasan as PimpinanPerubahanPenugasan;
 use App\Livewire\Pimpinan\PerubahanPkpt as PimpinanPerubahanPkpt;
 use App\Livewire\Pimpinan\PerubahanPkptDetail as PimpinanPerubahanPkptDetail;
 use App\Livewire\Profil;
@@ -114,6 +115,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/pimpinan/perubahan-pkpt/{perubahan}', PimpinanPerubahanPkptDetail::class)->name('pimpinan.perubahan-pkpt.show')->middleware('role:pimpinan')
         ->missing(fn () => to_route('pimpinan.perubahan-pkpt')->with('toast', ['type' => 'error', 'message' => BuangPerubahan::DIBUANG]));
     // Legacy bell links of the removed schedule revision page.
+    Route::get('/pimpinan/perubahan-penugasan', PimpinanPerubahanPenugasan::class)->name('pimpinan.perubahan-penugasan')->middleware('role:pimpinan');
     Route::redirect('/pimpinan/revisi-jadwal', '/pimpinan/perubahan-pkpt')->name('pimpinan.revisi-jadwal')->middleware('role:pimpinan');
     Route::get('/irban', IrbanDasbor::class)->name('irban.dashboard')->middleware('role:irban');
     Route::middleware('role:irban')->prefix('irban')->group(function () {

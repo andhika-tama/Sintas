@@ -50,7 +50,7 @@ class KinerjaSeeder extends Seeder
         $tahunIni = $sekarang->year;
         $stempel = $sekarang->format('Y-m-d H:i:s');
 
-        $irban = collect(['I', 'II', 'III', 'IV', 'V'])->map(fn ($n) => Irban::firstOrCreate(['nama' => "Irban {$n}"], ['kode_nomor' => "INSPEKTORAT-{$n}"]))->values();
+        $irban = collect(IrbanSeeder::DAFTAR)->map(fn ($kode, $nama) => Irban::firstOrCreate(['nama' => $nama], ['kode_nomor' => $kode]))->values();
         $user = [];
         foreach ([['admin', 'Administrator', Role::Admin], ['pimpinan', 'Inspektur', Role::Pimpinan], ['bagianumum', 'Bagian Umum', Role::BagianUmum]] as [$u, $nama, $role]) {
             $user[$u] = $this->akun($u, $nama, $role, null);

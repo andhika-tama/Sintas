@@ -128,8 +128,9 @@ class IrbanTest extends TestCase
         $this->seed(DatabaseSeeder::class);
         $this->seed(DatabaseSeeder::class); // idempotent
         $this->assertSame(5, Irban::count());
-        $this->assertSame(['Irban I', 'Irban II', 'Irban III', 'Irban IV', 'Irban V'], Irban::orderBy('id')->pluck('nama')->all());
+        $this->assertSame(['Irban I', 'Irban II', 'Irban III', 'Irban IV', 'Irban Khusus'], Irban::orderBy('id')->pluck('nama')->all());
         $this->assertSame('INSPEKTORAT-III', Irban::where('nama', 'Irban III')->value('kode_nomor'));
+        $this->assertSame('INSPEKTORAT-IRSUS', Irban::where('nama', 'Irban Khusus')->value('kode_nomor'));
         $this->assertSame(Irban::where('nama', 'Irban I')->value('id'), User::where('username', 'irban1')->value('irban_id'));
     }
 

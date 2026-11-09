@@ -16,6 +16,7 @@ use App\Actions\Spt\TandaiSelesai;
 use App\Actions\Spt\TerimaPengajuan;
 use App\Actions\Spt\TolakPengajuan;
 use App\Actions\Spt\UnggahDokumenSpt;
+use App\Enums\Role;
 use App\Enums\StatusSpt;
 use App\Models\Irban;
 use App\Models\IrbanTahunan;
@@ -40,7 +41,7 @@ use Illuminate\Support\Facades\Context;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Dev only (Fase 11 E11), run last: presentation data for Irban I–V on top of the Irban I demo of the other seeders.
+ * Dev only (Fase 11 E11), run last: presentation data for Irban I–IV and Irban Khusus on top of the Irban I demo of the other seeders.
  * PKPT 2025 (made and disahkan through the actions), 8 SPT per irban in 2025, every 2026 status per irban, two Perubahan PKPT 2026.
  * Writes go through the real actions at a travelled clock, so numbering, riwayat, activity log, cache refresh and bell entries are
  * produced by the app itself. 2026 dates are relative to today (clamped into 2026 by DatabaseSeeder), so the statuses stay true on presentation day.
@@ -52,7 +53,7 @@ class DemoPresentasiSeeder extends Seeder
         'Irban II' => [['Hendra Saputra, S.E., M.Si.', 'Rina Marlina, S.E.', 'Doni Prasetyo, S.H.', 'Yulia Anggraini, S.Ak.'], ['Tanjung Agung', 'Semende Darat Laut']],
         'Irban III' => [['Ir. Bambang Sutrisno, M.M.', 'Siti Rahmawati, S.E.', 'Fajar Nugroho, S.T.', 'Dewi Kartika, S.Ak.'], ['Rambang', 'Lubai']],
         'Irban IV' => [['Drs. Syamsul Bahri, M.Si.', 'Nurhayati, S.E.', 'Agus Setiawan, S.Kom.', 'Lestari Wulandari, S.H.'], ['Gelumbang', 'Lembak']],
-        'Irban V' => [['Zulkifli Hasan, S.H., M.H.', 'Mega Puspita, S.E.', 'Rudi Hartono, S.T.', 'Intan Permatasari, S.Ak.'], ['Sungai Rotan', 'Muara Belida']],
+        'Irban Khusus' => [['Zulkifli Hasan, S.H., M.H.', 'Mega Puspita, S.E.', 'Rudi Hartono, S.T.', 'Intan Permatasari, S.Ak.'], ['Sungai Rotan', 'Muara Belida']],
     ];
 
     /** Months of the eight 2025 items per irban; every 2025 SPT is marked Selesai with LHP (the late case is 2026 only). */
@@ -146,7 +147,7 @@ class DemoPresentasiSeeder extends Seeder
         }
 
         $hasil = [];
-        foreach ($data as $n => [$nama, $pegawai, $kecamatan]) {
+        foreach ($data as [$nama, $pegawai, $kecamatan]) {
             $irban = Irban::where('nama', $nama)->firstOrFail();
             foreach ([2025, $tahunIni] as $tahun) {
                 $k = IrbanTahunan::firstOrCreate(['irban_id' => $irban->id, 'tahun' => $tahun], ['ppj_pegawai_id' => $pegawai[0]]);
@@ -159,7 +160,7 @@ class DemoPresentasiSeeder extends Seeder
                     ['irban_id' => $irban->id]);
             }
             $hasil[] = [
-                'irban' => $irban, 'user' => User::where('username', 'irban'.($n + 1))->firstOrFail(), 'pegawai' => $pegawai,
+                'irban' => $irban, 'user' => User::where(['irban_id' => $irban->id, 'role' => Role::Irban])->orderBy('id')->firstOrFail(), 'pegawai' => $pegawai,
                 'kecamatan' => IrbanWilayah::where(['irban_id' => $irban->id, 'tahun' => $tahunIni])->whereHas('objek', fn ($q) => $q->where('jenis', 'kecamatan'))
                     ->orderBy('objek_id')->pluck('objek_id')->all(),
             ];
@@ -192,7 +193,7 @@ class DemoPresentasiSeeder extends Seeder
         $this->pada($unggah->setTime(14, 0), $u, fn () => app(UnggahDokumenSpt::class)->handle($u, $spt->fresh(), $diinput, $this->berkas('SPT-final-bertanda-tangan.pdf')));
         if ($lhp) {
             $this->pada($lhp->setTime(11, 0), $u, fn () => app(TandaiSelesai::class)->handle($u, $spt->fresh(), $diinput + [
-                'nomor_lhp' => '700/'.$spt->nomor_urut.'/LHP-'.mb_strtoupper(str_replace(' ', '', $t['irban']->nama)).'/'.$lhp->year, 'tanggal_lhp' => $lhp->toDateString(),
+                'nomor_lhp' => '700/'.$spt->fresh()->nomor_urut.'/LHP/'.$t['irban']->kode_nomor.'/'.$lhp->year, 'tanggal_lhp' => $lhp->toDateString(),
             ], $this->berkas('Cover-LHP.pdf')));
         }
 

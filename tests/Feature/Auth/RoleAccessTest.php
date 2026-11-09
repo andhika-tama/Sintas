@@ -60,10 +60,10 @@ class RoleAccessTest extends TestCase
     {
         $this->seed(DatabaseSeeder::class);
 
-        // Fase 11 Task 7 (E11): irban2–irban5 joined the four original accounts.
-        $this->assertSame(8, User::count());
+        // Fase 11 Task 7 (E11): irban2–irban4, irsus (Irban Khusus) and sekretaris joined the four original accounts.
+        $this->assertSame(9, User::count());
         $expected = ['admin' => Role::Admin, 'pimpinan' => Role::Pimpinan, 'irban1' => Role::Irban, 'bagianumum' => Role::BagianUmum,
-            'irban2' => Role::Irban, 'irban3' => Role::Irban, 'irban4' => Role::Irban, 'irban5' => Role::Irban];
+            'irban2' => Role::Irban, 'irban3' => Role::Irban, 'irban4' => Role::Irban, 'irsus' => Role::Irban, 'sekretaris' => Role::Pimpinan];
         foreach ($expected as $username => $role) {
             $u = User::where('username', $username)->firstOrFail();
             $this->assertSame($role, $u->role);

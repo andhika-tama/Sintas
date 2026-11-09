@@ -41,7 +41,7 @@ class DataDemoTest extends TestCase
 {
     use RefreshDatabase;
 
-    private const IRBAN = ['irban1' => 'Irban I', 'irban2' => 'Irban II', 'irban3' => 'Irban III', 'irban4' => 'Irban IV', 'irban5' => 'Irban V'];
+    private const IRBAN = ['irban1' => 'Irban I', 'irban2' => 'Irban II', 'irban3' => 'Irban III', 'irban4' => 'Irban IV', 'irsus' => 'Irban Khusus'];
 
     private function seedDemo(string $tanggal = '2026-10-15'): void
     {

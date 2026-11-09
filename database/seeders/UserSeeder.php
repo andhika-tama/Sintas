@@ -19,12 +19,13 @@ class UserSeeder extends Seeder
         $accounts = [
             ['admin', 'Administrator', Role::Admin],
             ['pimpinan', 'Inspektur', Role::Pimpinan],
+            ['sekretaris', 'Sekretaris', Role::Pimpinan],
             ['irban1', 'Irban I', Role::Irban],
             ['bagianumum', 'Bagian Umum', Role::BagianUmum],
             ['irban2', 'Irban II', Role::Irban],
             ['irban3', 'Irban III', Role::Irban],
             ['irban4', 'Irban IV', Role::Irban],
-            ['irban5', 'Irban V', Role::Irban],
+            ['irsus', 'Irban Khusus', Role::Irban],
         ];
 
         foreach ($accounts as [$username, $name, $role]) {

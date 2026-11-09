@@ -8,10 +8,19 @@ use Illuminate\Database\Seeder;
 // Reference data: runs in production too (the five Irban and their number codes are fixed).
 class IrbanSeeder extends Seeder
 {
+    /** Nama => kode nomor; the fifth is the Irban Khusus, whose letters read INSPEKTORAT-IRSUS (not Irban V). */
+    public const DAFTAR = [
+        'Irban I' => 'INSPEKTORAT-I',
+        'Irban II' => 'INSPEKTORAT-II',
+        'Irban III' => 'INSPEKTORAT-III',
+        'Irban IV' => 'INSPEKTORAT-IV',
+        'Irban Khusus' => 'INSPEKTORAT-IRSUS',
+    ];
+
     public function run(): void
     {
-        foreach (['I', 'II', 'III', 'IV', 'V'] as $n) {
-            Irban::firstOrCreate(['nama' => "Irban {$n}"], ['kode_nomor' => "INSPEKTORAT-{$n}"]);
+        foreach (self::DAFTAR as $nama => $kode) {
+            Irban::firstOrCreate(['nama' => $nama], ['kode_nomor' => $kode]);
         }
     }
 }

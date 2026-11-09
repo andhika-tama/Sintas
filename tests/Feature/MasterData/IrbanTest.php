@@ -123,23 +123,24 @@ class IrbanTest extends TestCase
         $this->assertModelExists($o);
     }
 
-    public function test_seeder_creates_five_irban_and_links_irban1(): void
+    public function test_seeder_creates_six_irban_and_links_irban1(): void
     {
         $this->seed(DatabaseSeeder::class);
         $this->seed(DatabaseSeeder::class); // idempotent
-        $this->assertSame(5, Irban::count());
-        $this->assertSame(['Irban I', 'Irban II', 'Irban III', 'Irban IV', 'Irban Khusus'], Irban::orderBy('id')->pluck('nama')->all());
+        $this->assertSame(6, Irban::count());
+        $this->assertSame(['Irban I', 'Irban II', 'Irban III', 'Irban IV', 'Irban Khusus', 'Sekretariat'], Irban::orderBy('id')->pluck('nama')->all());
         $this->assertSame('INSPEKTORAT-III', Irban::where('nama', 'Irban III')->value('kode_nomor'));
         $this->assertSame('INSPEKTORAT-IRSUS', Irban::where('nama', 'Irban Khusus')->value('kode_nomor'));
+        $this->assertSame('INSPEKTORAT-V', Irban::where('nama', 'Sekretariat')->value('kode_nomor'));
         $this->assertSame(Irban::where('nama', 'Irban I')->value('id'), User::where('username', 'irban1')->value('irban_id'));
     }
 
     public function test_seeder_runs_in_production(): void
     {
-        // Fase 11 Task 7 (E11): the five Irban are reference data, also on a production install.
+        // Fase 11 Task 7 (E11): the Irban are reference data, also on a production install.
         $this->app->detectEnvironment(fn () => 'production');
         (new IrbanSeeder)->run();
-        $this->assertSame(5, Irban::count());
+        $this->assertSame(6, Irban::count());
     }
 
     public function test_users_irban_id_has_foreign_key(): void

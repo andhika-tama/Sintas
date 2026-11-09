@@ -59,7 +59,7 @@ class Pengaturan extends Component
     protected function validationAttributes(): array
     {
         $labels = [
-            'penomoran.format' => 'Format nomor', 'penomoran.kode_arsip' => 'Kode arsip', 'penomoran.kode_sekretariat' => 'Kode sekretariat',
+            'penomoran.format' => 'Format nomor', 'penomoran.kode_arsip' => 'Kode arsip',
             'penomoran.scope' => 'Cakupan penomoran', 'penugasan.hitungan_hari' => 'Hitungan hari',
             'penanda.batas_terlambat_hari' => 'Batas terlambat', 'rekap.dasar_triwulan' => 'Dasar triwulan',
             'upload.maks_mb' => 'Ukuran maksimum unggahan', 'kendala.kategori' => 'Kategori kendala',

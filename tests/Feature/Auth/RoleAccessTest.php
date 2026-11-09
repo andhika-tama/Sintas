@@ -61,12 +61,13 @@ class RoleAccessTest extends TestCase
         $this->seed(DatabaseSeeder::class);
 
         // Fase 11 Task 7 (E11): irban2–irban4, irsus (Irban Khusus) and sekretaris joined the four original accounts.
-        $this->assertSame(9, User::count());
+        $this->assertSame(10, User::count());
         $expected = ['admin' => Role::Admin, 'pimpinan' => Role::Pimpinan, 'irban1' => Role::Irban, 'bagianumum' => Role::BagianUmum,
-            'irban2' => Role::Irban, 'irban3' => Role::Irban, 'irban4' => Role::Irban, 'irsus' => Role::Irban, 'sekretaris' => Role::Pimpinan];
+            'irban2' => Role::Irban, 'irban3' => Role::Irban, 'irban4' => Role::Irban, 'irsus' => Role::Irban, 'sekretaris' => Role::Pimpinan, 'sekretariat' => Role::Irban];
         foreach ($expected as $username => $role) {
             $u = User::where('username', $username)->firstOrFail();
             $this->assertSame($role, $u->role);
+            $this->assertSame($role === Role::Irban, $u->irban_id !== null, $username);
             $this->assertSame("{$username}@sintas.test", $u->email);
             $this->assertNotSame('password', $u->password);
             $this->assertTrue(Hash::check('password', $u->password));

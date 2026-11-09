@@ -22,7 +22,9 @@ class SettingsServiceTest extends TestCase
         $this->assertSame(14, $s->get('penanda.batas_terlambat_hari'));
         $this->assertTrue($s->get('penomoran.reset_tahunan'));
         $this->assertSame('Lainnya', last($s->get('kendala.kategori')));
-        $this->assertCount(20, Settings::DEFAULTS);
+        $this->assertCount(19, Settings::DEFAULTS);
+        $this->assertNotContains('penomoran.kode_sekretariat', Settings::GROUPS['penomoran']);
+        $this->assertArrayNotHasKey('penomoran.kode_sekretariat', Settings::DEFAULTS);
         $this->assertSame('', $s->get('kontak.peta_url'));
     }
 

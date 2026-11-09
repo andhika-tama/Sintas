@@ -251,7 +251,7 @@ class DataDemoTest extends TestCase
         foreach ([User::class, Spt::class, Pkpt::class, Tim::class, IrbanWilayah::class, Pegawai::class] as $model) {
             $this->assertSame(0, $model::count(), $model);
         }
-        $this->assertSame(5, Irban::count());
+        $this->assertSame(6, Irban::count());
         $this->assertGreaterThan(0, Objek::count());
         $this->assertGreaterThan(0, JenisPenugasan::count());
         $this->assertSame(5, Klasifikasi::count());

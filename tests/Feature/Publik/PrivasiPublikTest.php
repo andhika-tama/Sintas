@@ -6,8 +6,8 @@ use App\Livewire\Publik\Jadwal;
 use App\Livewire\Publik\Realisasi;
 use App\Models\Komentar;
 use App\Models\Pegawai;
+use App\Models\PerubahanPenugasan;
 use App\Models\PkptPerubahan;
-use App\Models\PkptUsulan;
 use App\Models\SptDokumen;
 use App\Models\User;
 use App\Services\Settings;
@@ -38,8 +38,8 @@ class PrivasiPublikTest extends TestCase
     private const RAHASIA = [
         'MK-PEGAWAI-Budi', '199001012020011001', 'MK-PERIODE-2025', 'MK-URAIAN-pemeriksaan', 'MK-CATATAN-bu', 'MK-LHP-900',
         'MK-KETERANGAN-item', 'MK-KENDALA-hujan', 'MK-KOMENTAR-tanya', 'MK-DOKUMEN-final.pdf', 'MK-USER-Penginput',
-        // Fase 9.2 Task 9: Perubahan PKPT and usulan never reach the public pages (only "Tambahan · Perubahan ke-N" and "semula").
-        'MK-ALASAN-perubahan', 'MK-SK-Perubahan-77', 'MK-ALASAN-usulan', 'MK-CATATAN-tutup', 'MK-KOMENTAR-putusan', 'perubahan-sk/mk-berkas.pdf',
+        // Fase 9.2 Task 9 / 1.2: Perubahan PKPT and Perubahan Penugasan never reach the public pages (only "Tambahan · Perubahan ke-N" and "semula").
+        'MK-ALASAN-perubahan', 'MK-SK-Perubahan-77', 'MK-ALASAN-penugasan', 'MK-CATATAN-tolak', 'MK-KOMENTAR-putusan', 'perubahan-sk/mk-berkas.pdf',
         // Versi 1.1.4: Nomor SPPD stays internal.
         'MK-SPPD-0042',
         // 1.2: free-text Lainnya jenis/objek of non-PKPT SPT.
@@ -66,15 +66,16 @@ class PrivasiPublikTest extends TestCase
         SptDokumen::create(['spt_id' => $this->v1->id, 'jenis' => 'final', 'path' => 'spt/1/x.pdf', 'nama_asli' => 'MK-DOKUMEN-final.pdf',
             'ukuran' => 10, 'sha256' => str_repeat('a', 64), 'diunggah_oleh' => $user->id]);
 
-        // An approved package that adds b1 and moved a1 (snapshot differs), with an SK; plus an open and a closed usulan.
+        // An approved package that adds b1 and moved a1 (snapshot differs), with an SK; plus a pending and a rejected Perubahan Penugasan.
         $paket = PkptPerubahan::factory()->disetujui(1)->create(['pkpt_id' => $this->a1->pkpt_id, 'alasan' => 'MK-ALASAN-perubahan',
             'komentar_putusan' => 'MK-KOMENTAR-putusan', 'nomor_sk' => 'MK-SK-Perubahan-77', 'tanggal_sk' => '2026-03-01',
             'berkas_sk' => 'perubahan-sk/mk-berkas.pdf', 'hash_sk' => str_repeat('b', 64)]);
         $paket->operasi()->create(['aksi' => 'tambah', 'pkpt_item_id' => $this->b1->id, 'urutan' => 1, 'data_baru' => ['irban_id' => $this->b->id]]);
         DB::table('pkpt_item')->where('id', $this->b1->id)->update(['ditambahkan_perubahan_id' => $paket->id]);
         DB::table('pkpt_item')->where('id', $this->a1->id)->update(['tanggal_mulai_disahkan' => '2026-01-12', 'tanggal_selesai_disahkan' => '2026-03-20']);
-        PkptUsulan::factory()->create(['pkpt_item_id' => $this->a1->id, 'alasan' => 'MK-ALASAN-usulan', 'diajukan_oleh' => $user->id]);
-        PkptUsulan::factory()->ditutup('MK-CATATAN-tutup')->create(['pkpt_item_id' => $this->a1->id, 'alasan' => 'MK-ALASAN-usulan', 'diajukan_oleh' => $user->id]);
+        PerubahanPenugasan::factory()->create(['pkpt_item_id' => $this->a1->id, 'alasan' => 'MK-ALASAN-penugasan', 'diajukan_oleh' => $user->id]);
+        PerubahanPenugasan::factory()->create(['pkpt_item_id' => $this->a1->id, 'alasan' => 'MK-ALASAN-penugasan', 'diajukan_oleh' => $user->id,
+            'status' => 'ditolak', 'catatan_putusan' => 'MK-CATATAN-tolak']);
     }
 
     public function test_jadwal_shows_tambahan_label_and_semula_only(): void

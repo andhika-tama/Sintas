@@ -103,7 +103,7 @@ class OtorisasiAksiTest extends TestCase
             [Admin\Tim::class, [], [['save'], ['delete']]],
             [Admin\WilayahIrban::class, [], [['save', $irbanId]]],
             [Admin\PerubahanPkpt::class, ['pkpt' => $perubahan->pkpt_id, 'perubahan' => $perubahan],
-                [['simpanForm'], ['simpanOperasi'], ['simpanSk'], ['ajukan'], ['buang'], ['aturPengingat'], ['tampung', 1]]],
+                [['simpanForm'], ['simpanOperasi'], ['simpanSk'], ['ajukan'], ['buang'], ['aturPengingat']]],
         ];
 
         foreach ($aksi as [$kelas, $param, $panggilan]) {

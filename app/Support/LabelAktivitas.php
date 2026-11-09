@@ -18,7 +18,6 @@ use App\Models\Pkpt;
 use App\Models\PkptItem;
 use App\Models\PkptPerubahan;
 use App\Models\PkptPerubahanItem;
-use App\Models\PkptUsulan;
 use App\Models\Spt;
 use App\Models\SptDokumen;
 use App\Models\SptKendala;
@@ -42,7 +41,8 @@ class LabelAktivitas
         'pkpt_item' => [PkptItem::class, 'Item PKPT'],
         'pkpt_perubahan' => [PkptPerubahan::class, 'Perubahan PKPT'],
         'pkpt_perubahan_item' => [PkptPerubahanItem::class, 'Operasi Perubahan PKPT'],
-        'pkpt_usulan' => [PkptUsulan::class, 'Usulan Perubahan'],
+        // Model removed in 1.2 Task 8; its old log rows keep this subject_type.
+        'pkpt_usulan' => ['App\Models\PkptUsulan', 'Usulan Perubahan'],
         'perubahan_penugasan' => [PerubahanPenugasan::class, 'Perubahan Penugasan'],
         'user' => [User::class, 'Pengguna'],
         'pegawai' => [Pegawai::class, 'Pegawai'],

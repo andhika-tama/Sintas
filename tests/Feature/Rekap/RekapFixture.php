@@ -5,9 +5,9 @@ namespace Tests\Feature\Rekap;
 use App\Models\Irban;
 use App\Models\JenisPenugasan;
 use App\Models\Klasifikasi;
+use App\Models\PerubahanPenugasan;
 use App\Models\Pkpt;
 use App\Models\PkptItem;
-use App\Models\PkptUsulan;
 use App\Models\Spt;
 use Carbon\CarbonImmutable;
 
@@ -19,7 +19,7 @@ use Carbon\CarbonImmutable;
  *   a2 Irban A, J2, 20 Mar–1 Apr, target null (=1)  → TW II  (1 April edge)
  *   a3 Irban A, J1, disahkan 1–31 Jul, moved by an approved Perubahan to 1–20 Okt, target 3 → TW IV
  *   b1 Irban B, J2, 1 Mei–30 Jun, target 2         → TW II
- *   b2 Irban B, J1, 1 Agu–30 Sep, target null (=1), open usulan to Des (ignored) → TW III
+ *   b2 Irban B, J1, 1 Agu–30 Sep, target null (=1), pending Perubahan Penugasan to Des (ignored) → TW III
  * PKPT 2027 Draf with an item dated Februari 2026, target 5 → ignored in 2026 (other year) and 2027 (Draf).
  *
  * SPT (R = REGULER, K = KHUSUS):
@@ -71,7 +71,7 @@ trait RekapFixture
         $a3->update(['tanggal_mulai' => '2026-10-01', 'tanggal_selesai' => '2026-10-20']);
         $b1 = $item($this->b, $this->j2, '2026-05-01', '2026-06-30', 2);
         $b2 = $item($this->b, $this->j1, '2026-08-01', '2026-09-30', null);
-        PkptUsulan::factory()->create(['pkpt_item_id' => $b2->id, 'tanggal_mulai' => '2026-12-01', 'tanggal_selesai' => '2026-12-20']);
+        PerubahanPenugasan::factory()->create(['pkpt_item_id' => $b2->id, 'tanggal_mulai' => '2026-12-01', 'tanggal_selesai' => '2026-12-20']);
         $draf = Pkpt::factory()->create(['tahun' => 2027]);
         PkptItem::factory()->create(['pkpt_id' => $draf->id, 'irban_id' => $this->a->id, 'jenis_penugasan_id' => $this->j1->id,
             'tanggal_mulai' => '2026-02-01', 'tanggal_selesai' => '2026-02-28', 'target_spt' => 5]);

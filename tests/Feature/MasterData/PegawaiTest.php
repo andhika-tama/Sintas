@@ -6,7 +6,7 @@ use App\Actions\MasterData\DeletePegawai;
 use App\Enums\Role;
 use App\Livewire\Admin\Pegawai as Page;
 use App\Models\Pegawai;
-use App\Models\PkptUsulan;
+use App\Models\PerubahanPenugasan;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
@@ -146,10 +146,10 @@ class PegawaiTest extends TestCase
         app(DeletePegawai::class)->handle($p);
     }
 
-    public function test_pegawai_referenced_only_by_usulan_diinput_oleh_is_referenced(): void
+    public function test_pegawai_referenced_only_by_perubahan_penugasan_diinput_oleh_is_referenced(): void
     {
         $p = Pegawai::factory()->create();
-        PkptUsulan::factory()->create(['diinput_oleh' => $p->id]);
+        PerubahanPenugasan::factory()->create(['diinput_oleh' => $p->id]);
         $this->assertTrue($p->isReferenced());
         $this->expectException(ValidationException::class);
         app(DeletePegawai::class)->handle($p);

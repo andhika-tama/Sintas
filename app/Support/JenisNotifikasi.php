@@ -20,6 +20,7 @@ class JenisNotifikasi
         'perubahan_pkpt_ditolak' => ['ikon' => 'calendar-days', 'nada' => 'danger'],
         'pengingat_perubahan_pkpt' => ['ikon' => 'clock', 'nada' => 'warning'],
         'pengingat_sk_perubahan' => ['ikon' => 'document-arrow-up', 'nada' => 'warning'],
+        // Usulan flow removed in 1.2 Task 8: kept so old notification rows keep their icon.
         'usulan_perubahan_baru' => ['ikon' => 'inbox-arrow-down', 'nada' => 'info'],
         'usulan_perubahan_diterapkan' => ['ikon' => 'check-circle', 'nada' => 'success'],
         'usulan_perubahan_ditutup' => ['ikon' => 'x-circle', 'nada' => 'neutral'],

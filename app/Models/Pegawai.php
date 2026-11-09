@@ -28,7 +28,6 @@ class Pegawai extends Model
         return DB::table('tim_anggota')->where('pegawai_id', $this->id)->exists()
             || DB::table('irban_anggota')->where('pegawai_id', $this->id)->exists()
             || DB::table('irban_tahunan')->where('ppj_pegawai_id', $this->id)->exists()
-            || DB::table('pkpt_usulan')->where('diinput_oleh', $this->id)->exists()
             || DB::table('perubahan_penugasan')->where('diinput_oleh', $this->id)->exists()
             || DB::table('spt')->where(fn ($q) => $q->where('ppj_pegawai_id', $this->id)->orWhere('diinput_oleh', $this->id)->orWhere('penandatangan_pegawai_id', $this->id))->exists()
             || DB::table('spt_personel')->where('pegawai_id', $this->id)->exists()

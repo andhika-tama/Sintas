@@ -6,13 +6,11 @@ use App\Actions\Pkpt\DeletePkptItem;
 use App\Actions\Pkpt\Perubahan\BuatPerubahan;
 use App\Actions\Pkpt\SahkanPkpt;
 use App\Actions\Pkpt\SavePkptItem;
-use App\Enums\StatusUsulan;
 use App\Models\Irban;
 use App\Models\JenisPenugasan;
 use App\Models\Pkpt;
 use App\Models\PkptItem;
 use App\Models\PkptPerubahan;
-use App\Models\PkptUsulan;
 use App\Services\KesesuaianPkpt;
 use App\Services\PerubahanPkpt;
 use Illuminate\Support\Facades\Gate;
@@ -216,7 +214,6 @@ class PkptDetail extends Component
             'items' => $items,
             'rentang' => $rentang,
             'riwayat' => $draf ? [] : $perubahan->riwayatItemUntuk(auth()->user(), $items->pluck('id')->all()),
-            'usulanTerbuka' => $draf ? 0 : PkptUsulan::where('pkpt_id', $this->pkpt->id)->where('status', StatusUsulan::Terbuka->value)->count(),
             'total' => $this->pkpt->items()->aktif()->count(),
             'tanpaTarget' => $this->pkpt->jumlahTanpaTarget(),
             'irbans' => Irban::orderBy('id')->pluck('nama', 'id')->all(),

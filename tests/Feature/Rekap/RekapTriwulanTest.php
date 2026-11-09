@@ -22,7 +22,7 @@ use Tests\TestCase;
  *   a2 Irban A, J2, 20 Mar–1 Apr, target null (=1)  → TW II  (1 April edge)
  *   a3 Irban A, J1, disahkan 1–31 Jul, moved by an approved Perubahan to 1–20 Okt, target 3 → TW IV
  *   b1 Irban B, J2, 1 Mei–30 Jun, target 2         → TW II
- *   b2 Irban B, J1, 1 Agu–30 Sep, target null (=1), open usulan to Des (ignored) → TW III
+ *   b2 Irban B, J1, 1 Agu–30 Sep, target null (=1), pending Perubahan Penugasan to Des (ignored) → TW III
  * PKPT 2027 Draf with an item dated Februari 2026, target 5 → ignored in 2026 (other year) and 2027 (Draf).
  *
  * SPT (R = REGULER, K = KHUSUS):

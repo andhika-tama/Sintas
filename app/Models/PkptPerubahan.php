@@ -58,11 +58,6 @@ class PkptPerubahan extends Model
         return $this->hasMany(PkptPerubahanRiwayat::class, 'perubahan_id');
     }
 
-    public function usulan()
-    {
-        return $this->hasMany(PkptUsulan::class, 'perubahan_id');
-    }
-
     public function pembuat()
     {
         return $this->belongsTo(User::class, 'dibuat_oleh');

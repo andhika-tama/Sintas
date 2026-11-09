@@ -1,5 +1,5 @@
 {{-- Admin page of one Perubahan PKPT (Fase 9.2 Task 7; admin.md PKPT, _shared.md §1 page header, §4 forms, §5 modals/toasts; DESIGN §8).
-     Order: rejection alert → jenis/alasan → operasi (before → after) → validation strip (PerubahanPkpt::cek) → usulan panel (Task 9) → SK →
+     Order: rejection alert → jenis/alasan → operasi (before → after) → validation strip (PerubahanPkpt::cek) → SK →
      actions; riwayat in the side column (≥1024, stacked below on smaller screens). Status is the rectangular x-app.tag (pills stay for SPT).
      When an action removes its trigger, `fokus-ke` moves focus to the h1 or the operasi heading. No animation (DESIGN §7.5); modal transitions only. --}}
 @php
@@ -98,54 +98,6 @@
                     @endif
                 </div>
             @endif
-
-            {{-- Panel "Usulan dari Irban" (Task 9): open usulan of this PKPT, oldest first. "Tampung ke perubahan" only while the package is
-                 editable; "Tutup usulan" (catatan required) always. "Diinput oleh" in the audit form of login.md §5. --}}
-            <x-ui.card>
-                <h2 id="judul-usulan" tabindex="-1" class="font-display text-[22px] leading-[30px] font-bold text-neutral-900 focus:outline-none">Usulan dari Irban <span class="font-sans text-base font-medium text-neutral-600 tabular-nums">({{ $usulan->count() }})</span></h2>
-                @if ($usulan->isEmpty())
-                    <p class="mt-4 rounded-md border border-dashed border-neutral-300 p-4 text-sm text-neutral-600">Tidak ada usulan terbuka dari Irban.</p>
-                @else
-                    @unless ($bisaUbah)
-                        <p class="mt-1 text-sm text-neutral-600">Usulan hanya dapat ditampung ke perubahan berstatus Draf atau Ditolak.</p>
-                    @endunless
-                    <ul role="list" class="mt-4 divide-y divide-neutral-200 rounded-md border border-neutral-200">
-                        @foreach ($usulan as $u)
-                            @php
-                                $j = $u->item?->jenisPenugasan ?? $u->jenisPenugasan;
-                                $baru = $u->tanggal_mulai && $u->tanggal_selesai && in_array($u->aksi_usulan, [\App\Enums\AksiUsulan::Geser, \App\Enums\AksiUsulan::Tambah], true)
-                                    ? \App\Support\Tanggal::rentang($u->tanggal_mulai, $u->tanggal_selesai) : null;
-                                $konteks = $u->aksi_usulan->label().' · '.$u->irban->nama;
-                            @endphp
-                            <li wire:key="usulan-{{ $u->id }}" class="relative p-4 text-sm">
-                                <div class="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-                                    <p class="font-semibold text-neutral-900">{{ $u->irban->nama }} · {{ $u->aksi_usulan->label() }}</p>
-                                    <p class="text-xs text-neutral-500 tabular-nums">{{ $tgl($u->created_at) }}</p>
-                                </div>
-                                <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
-                                    @if ($j)<x-app.type-chip :color="$j->warna" :label="$j->nama" />@endif
-                                    <span class="text-neutral-600 tabular-nums">{{ $u->item ? 'Jadwal berlaku '.\App\Support\Tanggal::rentang($u->item->tanggal_mulai, $u->item->tanggal_selesai) : 'Item baru' }}</span>
-                                </div>
-                                @if ($baru)
-                                    <p class="mt-1 text-neutral-900 tabular-nums">Jadwal baru {{ $baru }}</p>
-                                @endif
-                                <p class="mt-2 whitespace-pre-line break-words text-neutral-900">{{ $u->alasan }}</p>
-                                <p class="mt-1 text-xs text-neutral-600">
-                                    @if ($u->diinputOleh)Diinput oleh <strong class="font-semibold">{{ $u->diinputOleh->nama_bergelar }}</strong> (akun {{ $u->irban->nama }})@else Diajukan oleh {{ $u->diajukanOleh?->name ?? $u->irban->nama }}@endif
-                                </p>
-                                <div class="mt-3 flex flex-wrap gap-2 max-sm:[&>*]:w-full">
-                                    @if ($bisaUbah)
-                                        <x-ui.button type="button" size="sm" icon="arrow-down-on-square" wire:click="tampung({{ $u->id }})" wire:loading.attr="disabled" wire:target="tampung"
-                                            aria-label="Tampung ke perubahan: {{ $konteks }}" class="max-lg:h-11">Tampung ke perubahan</x-ui.button>
-                                    @endif
-                                    <x-ui.button type="button" size="sm" variant="secondary" icon="x-circle" wire:click="bukaTutup({{ $u->id }})"
-                                        aria-label="Tutup usulan: {{ $konteks }}" class="max-lg:h-11">Tutup usulan</x-ui.button>
-                                </div>
-                            </li>
-                        @endforeach
-                    </ul>
-                @endif
-            </x-ui.card>
 
             <x-ui.card>
                 <div class="flex flex-wrap items-center justify-between gap-2">
@@ -302,15 +254,4 @@
             </x-slot:footer>
         </x-ui.modal>
     @endif
-    <x-ui.modal name="usulan-tutup" title="Tutup usulan?" size="md" wire:model="tutupOpen">
-        <form id="form-tutup-usulan" wire:submit="tutupUsulan" novalidate class="space-y-4">
-            <p>Usulan ditutup tanpa diterapkan. Irban dan pegawai penginput menerima catatan ini.</p>
-            <x-ui.textarea name="catatan_penutupan" label="Catatan penutupan" required wire:model="catatan_penutupan" rows="3" maxlength="1000"
-                helper="Minimal 10 karakter, maksimal 1000." :error="$errors->first('catatan_penutupan')" />
-        </form>
-        <x-slot:footer>
-            <x-ui.button type="button" variant="secondary" x-on:click="$dispatch('close-modal', { name: 'usulan-tutup' })">Batal</x-ui.button>
-            <x-ui.button form="form-tutup-usulan" icon="x-circle" wire:loading.attr="disabled" wire:target="tutupUsulan">Tutup usulan</x-ui.button>
-        </x-slot:footer>
-    </x-ui.modal>
 </div>

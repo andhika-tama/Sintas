@@ -5,8 +5,8 @@ namespace Tests\Feature\Pkpt;
 use App\Models\Irban;
 use App\Models\IrbanWilayah;
 use App\Models\Objek;
+use App\Models\PerubahanPenugasan;
 use App\Models\PkptItem;
-use App\Models\PkptUsulan;
 use App\Services\KalenderPkpt;
 use App\Services\WilayahPengawasan;
 use Database\Seeders\IrbanSeeder;
@@ -120,12 +120,12 @@ class KalenderPkptTest extends TestCase
         $this->assertSame([], array_filter(array_merge(...array_map(fn ($b) => array_column($b['minggu'], 'ini'), $k))));
     }
 
-    public function test_moved_item_shows_semula_and_open_usulan_changes_nothing(): void
+    public function test_moved_item_shows_semula_and_perubahan_penugasan_changes_nothing(): void
     {
         $item = PkptItem::where('irban_id', $this->irban->id)->whereDate('tanggal_mulai', '2026-06-29')->first(); // Jul M1
         JadwalItem::geser($item, '2026-11-02', '2026-11-06');
         $lain = PkptItem::where('irban_id', $this->irban->id)->whereDate('tanggal_mulai', '2026-10-05')->first(); // Okt M1
-        PkptUsulan::factory()->create(['pkpt_item_id' => $lain->id, 'tanggal_mulai' => '2026-12-01', 'tanggal_selesai' => '2026-12-02']);
+        PerubahanPenugasan::factory()->create(['pkpt_item_id' => $lain->id, 'tanggal_mulai' => '2026-12-01', 'tanggal_selesai' => '2026-12-02']);
 
         $k = app(KalenderPkpt::class)->untuk(2026, $this->irban->id);
 

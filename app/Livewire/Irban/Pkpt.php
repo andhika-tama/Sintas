@@ -139,6 +139,10 @@ class Pkpt extends Component
     public function render(KesesuaianPkpt $kesesuaian, KalenderPkpt $kalender, WilayahPengawasan $wilayah, PerubahanPkpt $perubahan)
     {
         $user = $this->irban();
+        // Old UsulanPerubahanDiputuskan notifications (removed in 1.2 Task 8) link to `tampilan=usulan`.
+        if ($this->tampilan === 'usulan') {
+            $this->tampilan = 'perubahan';
+        }
         if (! in_array($this->tampilan, self::TAMPILAN, true)) {
             $this->tampilan = 'kalender';
         }

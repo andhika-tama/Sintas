@@ -20,11 +20,11 @@ use App\Models\LandingSlide;
 use App\Models\NomorCounter;
 use App\Models\Objek;
 use App\Models\Pegawai;
+use App\Models\PerubahanPenugasan;
 use App\Models\Pkpt;
 use App\Models\PkptItem;
 use App\Models\PkptPerubahan;
 use App\Models\PkptPerubahanItem;
-use App\Models\PkptUsulan;
 use App\Models\Spt;
 use App\Models\SptDokumen;
 use App\Models\SptKendala;
@@ -55,7 +55,7 @@ class LogAktivitasTest extends TestCase
     {
         foreach ([User::class, Pegawai::class, Irban::class, IrbanTahunan::class, Tim::class, TimAnggota::class, Objek::class,
             IrbanWilayah::class, JenisPenugasan::class, Klasifikasi::class, Pkpt::class, PkptItem::class, PkptPerubahan::class,
-            PkptPerubahanItem::class, PkptUsulan::class, Spt::class, SptPersonel::class, SptDokumen::class, SptKendala::class,
+            PkptPerubahanItem::class, PerubahanPenugasan::class, Spt::class, SptPersonel::class, SptDokumen::class, SptKendala::class,
             Komentar::class, LandingSlide::class, NomorCounter::class] as $kelas) {
             $this->assertContains(DicatatAktivitas::class, class_uses_recursive($kelas), $kelas);
         }

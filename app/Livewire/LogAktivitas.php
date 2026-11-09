@@ -3,9 +3,11 @@
 namespace App\Livewire;
 
 use App\Models\Aktivitas;
+use App\Models\Spt;
 use App\Models\User;
 use App\Support\LabelAktivitas;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Url;
@@ -101,7 +103,7 @@ class LogAktivitas extends Component
         $morph = (new User)->getMorphClass();
         $aktif = array_filter($this->only(self::FILTER), fn ($v) => $v !== '');
 
-        $q = Aktivitas::query()->with(['causer', 'diinputOleh', 'subject'])->latest('id');
+        $q = Aktivitas::query()->with(['causer', 'diinputOleh'])->latest('id');
         if ($this->dari) {
             $q->where('created_at', '>=', self::tanggal($this->dari));
         }
@@ -113,7 +115,7 @@ class LogAktivitas extends Component
         }
         if ($this->objek) {
             $kelas = LabelAktivitas::kelas($this->objek);
-            $kelas ? $q->where('subject_type', (new $kelas)->getMorphClass()) : $q->where('log_name', $this->objek)->whereNull('subject_type');
+            $kelas ? $q->where('subject_type', Relation::getMorphAlias($kelas)) : $q->where('log_name', $this->objek)->whereNull('subject_type');
         }
         if ($this->aksi) {
             $this->aksi === 'lainnya' ? $q->where(fn ($w) => $w->whereNull('event')->orWhereNotIn('event', ['created', 'updated', 'deleted'])) : $q->where('event', $this->aksi);
@@ -122,8 +124,12 @@ class LogAktivitas extends Component
             $q->untukSpt((int) $this->spt);
         }
 
+        $baris = $q->paginate(self::PER_HALAMAN);
+        // Only an SPT subject is shown (its nomor); loading every type would fail on rows of a deleted model (PkptUsulan, 1.2 Task 8).
+        $baris->getCollection()->where('subject_type', (new Spt)->getMorphClass())->load('subject');
+
         return view('livewire.log-aktivitas', [
-            'baris' => $q->paginate(self::PER_HALAMAN),
+            'baris' => $baris,
             'aktif' => $aktif,
             'penggunaOpsi' => $this->penggunaOpsi,
         ])->title('Log Aktivitas');

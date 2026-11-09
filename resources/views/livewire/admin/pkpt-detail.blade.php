@@ -39,8 +39,7 @@
     </x-ui.page-header>
 
     @unless ($draf)
-        <x-ui.tabs :tabs="['item' => 'Item', 'perubahan' => 'Perubahan']" :active="$tabAktif" model="tab" label="Bagian PKPT" panel="panel-pkpt"
-            :badges="['perubahan' => [$usulanTerbuka, $usulanTerbuka.' usulan dari Irban terbuka']]" />
+        <x-ui.tabs :tabs="['item' => 'Item', 'perubahan' => 'Perubahan']" :active="$tabAktif" model="tab" label="Bagian PKPT" panel="panel-pkpt" />
         <div role="tabpanel" id="panel-pkpt" aria-labelledby="panel-pkpt-tab-{{ $tabAktif }}">
     @endunless
 

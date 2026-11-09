@@ -13,14 +13,12 @@ use App\Actions\Pkpt\Perubahan\SimpanSkPerubahan;
 use App\Enums\AksiPerubahan;
 use App\Enums\StatusItemPkpt;
 use App\Enums\StatusPerubahan;
-use App\Enums\StatusUsulan;
 use App\Models\Irban;
 use App\Models\JenisPenugasan;
 use App\Models\Pkpt;
 use App\Models\PkptItem;
 use App\Models\PkptPerubahan;
 use App\Models\PkptPerubahanItem;
-use App\Models\PkptUsulan;
 use App\Models\Spt;
 use App\Models\User;
 use App\Services\PenandaSpt;
@@ -34,7 +32,7 @@ use Illuminate\Validation\ValidationException;
 use Tests\Support\PdfUji;
 use Tests\TestCase;
 
-/** Fase 9.2 Task 6: Perubahan PKPT rules, application on approval, K7, SK, usulan transitions. */
+/** Fase 9.2 Task 6: Perubahan PKPT rules, application on approval, K7, SK. */
 class PerubahanPkptTest extends TestCase
 {
     use RefreshDatabase;
@@ -377,36 +375,5 @@ class PerubahanPkptTest extends TestCase
         // After approval the impact is read from data_lama, so the history keeps showing the flip.
         $flip = app(PerubahanPkpt::class)->dampak($p)['spt'][0];
         $this->assertSame([false, true], [$flip['sebelum'], $flip['sesudah']]);
-    }
-
-    public function test_usulan_follow_the_package(): void
-    {
-        $usulan = fn () => PkptUsulan::factory()->create(['pkpt_item_id' => $this->a->id]);
-        $tampung = function (PkptPerubahan $p, PkptUsulan $u, PkptItem $item) {
-            $op = $this->op($p, ['aksi' => 'ubah', 'pkpt_item_id' => $item->id, 'keterangan' => 'Dari usulan']);
-            $op->forceFill(['usulan_id' => $u->id])->save();
-            PkptUsulan::whereKey($u->id)->update(['status' => StatusUsulan::Ditampung->value, 'perubahan_id' => $p->id]);
-
-            return $op;
-        };
-
-        // Operation removed → usulan back to terbuka.
-        $p = $this->buat();
-        $u1 = $usulan();
-        app(HapusOperasi::class)->handle($this->admin, $tampung($p, $u1, $this->a));
-        $this->assertSame([StatusUsulan::Terbuka, null], [$u1->fresh()->status, $u1->fresh()->perubahan_id]);
-
-        // Package discarded → terbuka.
-        $tampung($p, $u1, $this->a);
-        app(BuangPerubahan::class)->handle($this->admin, $p);
-        $this->assertSame([StatusUsulan::Terbuka, null], [$u1->fresh()->status, $u1->fresh()->perubahan_id]);
-
-        // Approved → diterapkan; a usulan that was not taken in is untouched.
-        $p = $this->buat();
-        $tampung($p, $u1, $this->a);
-        $u2 = $usulan();
-        $this->putuskan($this->ajukan($p), true);
-        $this->assertSame(StatusUsulan::Diterapkan, $u1->fresh()->status);
-        $this->assertSame(StatusUsulan::Terbuka, $u2->fresh()->status);
     }
 }

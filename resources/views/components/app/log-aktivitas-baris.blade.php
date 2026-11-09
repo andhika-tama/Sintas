@@ -16,7 +16,7 @@
     $idDetail = 'log-detail-'.$a->id;
     $label = LabelAktivitas::objek($a->subject_type, $a->log_name);
     $adalahSpt = $a->subject_type === (new Spt)->getMorphClass() && $a->subject_id;
-    $nomor = $a->subject?->nomor_lengkap ?? $baru['nomor_lengkap'] ?? $lama['nomor_lengkap'] ?? null;
+    $nomor = ($adalahSpt ? $a->subject?->nomor_lengkap : null) ?? $baru['nomor_lengkap'] ?? $lama['nomor_lengkap'] ?? null;
     $waktu = LabelAktivitas::waktu($a->created_at);
 @endphp
 <tbody x-data="{ buka: false }" wire:key="log-{{ $a->id }}">

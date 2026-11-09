@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 /** One operation of a Perubahan PKPT. data_baru/data_lama: {irban_id, jenis_penugasan_id, tanggal_mulai, tanggal_selesai, keterangan, target_spt}. */
-#[Fillable(['perubahan_id', 'aksi', 'pkpt_item_id', 'data_baru', 'data_lama', 'usulan_id', 'urutan'])]
+#[Fillable(['perubahan_id', 'aksi', 'pkpt_item_id', 'data_baru', 'data_lama', 'urutan'])]
 class PkptPerubahanItem extends Model
 {
     /** @use HasFactory<PkptPerubahanItemFactory> */
@@ -31,10 +31,5 @@ class PkptPerubahanItem extends Model
     public function item()
     {
         return $this->belongsTo(PkptItem::class, 'pkpt_item_id');
-    }
-
-    public function usulan()
-    {
-        return $this->belongsTo(PkptUsulan::class, 'usulan_id');
     }
 }

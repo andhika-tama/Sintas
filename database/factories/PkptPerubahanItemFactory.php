@@ -21,7 +21,6 @@ class PkptPerubahanItemFactory extends Factory
             'pkpt_item_id' => PkptItem::factory(),
             'data_baru' => fn (array $a) => self::data(PkptItem::find($a['pkpt_item_id'])),
             'data_lama' => null,
-            'usulan_id' => null,
             'urutan' => 1,
         ];
     }

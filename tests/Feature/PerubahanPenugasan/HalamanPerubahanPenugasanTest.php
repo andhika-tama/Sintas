@@ -222,6 +222,16 @@ class HalamanPerubahanPenugasanTest extends TestCase
             ->assertDontSee('Usulan')->assertDontSee('Perubahan PKPT');
     }
 
+    /** 1.2 Task 8: old UsulanPerubahanDiputuskan notifications link to `tampilan=usulan`; it lands on the Perubahan Penugasan list. */
+    public function test_old_usulan_link_opens_perubahan_penugasan_view(): void
+    {
+        $this->ajukan();
+
+        $this->actingAs($this->irban)->get('/irban/pkpt?tahun=2026&tampilan=usulan')->assertOk()
+            ->assertSee('Perubahan Penugasan Saya')->assertSee('OPD sedang diaudit BPK.');
+        Livewire::withQueryParams(['tampilan' => 'usulan'])->actingAs($this->irban)->test(HalamanIrban::class)->assertSet('tampilan', 'perubahan');
+    }
+
     public function test_spt_form_hint_and_prefill_for_marked_item(): void
     {
         $p = $this->ajukan();

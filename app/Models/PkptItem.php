@@ -89,4 +89,10 @@ class PkptItem extends Model
     {
         return $this->hasMany(PkptPerubahanItem::class);
     }
+
+    /** The latest approved Perubahan Penugasan (1.2 K6): set = every SPT on this item is Tidak Sesuai PKPT. */
+    public function perubahanPenugasan()
+    {
+        return $this->belongsTo(PerubahanPenugasan::class, 'perubahan_penugasan_id');
+    }
 }

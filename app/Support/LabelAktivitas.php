@@ -13,6 +13,7 @@ use App\Models\LandingSlide;
 use App\Models\NomorCounter;
 use App\Models\Objek;
 use App\Models\Pegawai;
+use App\Models\PerubahanPenugasan;
 use App\Models\Pkpt;
 use App\Models\PkptItem;
 use App\Models\PkptPerubahan;
@@ -42,6 +43,7 @@ class LabelAktivitas
         'pkpt_perubahan' => [PkptPerubahan::class, 'Perubahan PKPT'],
         'pkpt_perubahan_item' => [PkptPerubahanItem::class, 'Operasi Perubahan PKPT'],
         'pkpt_usulan' => [PkptUsulan::class, 'Usulan Perubahan'],
+        'perubahan_penugasan' => [PerubahanPenugasan::class, 'Perubahan Penugasan'],
         'user' => [User::class, 'Pengguna'],
         'pegawai' => [Pegawai::class, 'Pegawai'],
         'irban' => [Irban::class, 'Irban'],

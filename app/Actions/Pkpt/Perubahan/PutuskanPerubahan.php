@@ -110,7 +110,12 @@ class PutuskanPerubahan
             $op->forceFill(['data_lama' => PerubahanPkpt::data($item)])->save();
             $item->fill($op->aksi === AksiPerubahan::Ubah
                 ? SavePkptItem::validated($pkpt, $op->data_baru)
-                : ['status' => StatusItemPkpt::Dihapus, 'dihapus_perubahan_id' => $p->id])->save();
+                : ['status' => StatusItemPkpt::Dihapus, 'dihapus_perubahan_id' => $p->id]);
+            if ($item->isDirty(['tanggal_mulai', 'tanggal_selesai'])) {
+                // 1.2 K10: an official date change replaces the Perubahan Penugasan, so its SPT can be sesuai again.
+                $item->perubahan_penugasan_id = null;
+            }
+            $item->save();
         }
     }
 }

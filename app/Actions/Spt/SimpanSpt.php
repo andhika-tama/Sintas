@@ -169,7 +169,9 @@ class SimpanSpt
         }
         $mulai = $this->tanggal($data['tanggal_mulai'] ?? null);
         $selesai = $this->tanggal($data['tanggal_selesai'] ?? null);
-        if ($mulai && $selesai && ! $this->kesesuaian->sesuai($item, $mulai, $selesai)) {
+        if ($item->perubahan_penugasan_id !== null) {
+            $w[] = 'Jadwal item ini diubah lewat Perubahan Penugasan. SPT akan ditandai Tidak Sesuai PKPT.';
+        } elseif ($mulai && $selesai && ! $this->kesesuaian->sesuai($item, $mulai, $selesai)) {
             [$m, $s] = $this->kesesuaian->rentang($item);
             $w[] = 'Di luar jadwal PKPT ('.Tanggal::rentang($m, $s).'). SPT akan ditandai Tidak Sesuai PKPT.';
         }

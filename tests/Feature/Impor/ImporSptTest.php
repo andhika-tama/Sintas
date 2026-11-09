@@ -139,6 +139,20 @@ class ImporSptTest extends TestCase
         $this->assertSame(1, Aktivitas::where('subject_type', $pegawai->getMorphClass())->where('subject_id', $pegawai->id)->where('event', 'updated')->count());
     }
 
+    /** 1.2 Task 2 (R4): an imported SPT takes the kode arsip of its number's first segment when it is in the master, else 700. */
+    public function test_kode_arsip_dari_segmen_pertama_nomor(): void
+    {
+        $rows = $this->analisis([
+            $this->baris(['nomor_spt' => '800/1/I/SPT/2025']),
+            $this->baris(['nomor_spt' => 'X9/2/I/SPT/2025']),
+        ]);
+        $this->assertSame(['valid', 'valid'], array_column($rows, 'status'), json_encode(array_column($rows, 'errors')));
+        app(ImporSpt::class)->handle($this->admin, $rows, 'a.xlsx');
+
+        $this->assertSame(['800/1/I/SPT/2025' => '800', 'X9/2/I/SPT/2025' => '700'],
+            Spt::with('kodeArsip')->orderBy('id')->get()->mapWithKeys(fn ($s) => [$s->nomor_lengkap => $s->kodeArsip->kode])->all());
+    }
+
     public function test_tidak_selesai_dengan_lhp_tetap_menyimpan_lhp(): void
     {
         app(ImporSpt::class)->handle($this->admin, $this->analisis([$this->baris(['selesai' => 'tidak'])]), 'a.xlsx');

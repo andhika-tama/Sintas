@@ -103,7 +103,7 @@ class Pengajuan extends Component
             return;
         }
         $tanggal = CarbonImmutable::now('Asia/Jakarta');
-        $this->pratinjau = app(Penomoran::class)->pratinjau($spt->irban, $tanggal, $spt->klasifikasi)['nomor_lengkap'];
+        $this->pratinjau = app(Penomoran::class)->pratinjau($spt->irban, $tanggal, $spt->klasifikasi, $spt->kodeArsip)['nomor_lengkap'];
         $this->nomor_sppd = (string) $spt->nomor_sppd;
         $this->resetErrorBag();
         $this->showTerima = true;

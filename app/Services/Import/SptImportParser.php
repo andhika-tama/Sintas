@@ -10,6 +10,7 @@ use App\Models\Irban;
 use App\Models\IrbanTahunan;
 use App\Models\JenisPenugasan;
 use App\Models\Klasifikasi;
+use App\Models\KodeArsip;
 use App\Models\NomorCounter;
 use App\Models\Objek;
 use App\Models\Pegawai;
@@ -155,6 +156,7 @@ class SptImportParser
             'irban' => $irban,
             'klasifikasi' => Klasifikasi::all()->keyBy(fn ($k) => $kunci($k->nama)),
             'jenis' => JenisPenugasan::all(['id', 'nama'])->keyBy(fn ($j) => $kunci($j->nama)),
+            'kodeArsip' => KodeArsip::pluck('id', 'kode')->mapWithKeys(fn ($id, $kode) => [$kunci($kode) => $id])->all(),
             'objek' => $objek,
             'pegawai' => Pegawai::whereIn('nip', array_unique($nip))->pluck('id', 'nip')->all(),
             // Compared lower-cased on every driver (MySQL's unique index is case-insensitive, SQLite's `=` is not).
@@ -367,6 +369,8 @@ class SptImportParser
 
         $data = [
             'irban_id' => $irban?->id, 'klasifikasi_id' => $klas?->id, 'jenis_penugasan_id' => $jenis?->id, 'pkpt_item_id' => $pkptItemId,
+            // The kode arsip is the first segment of the old number when it is in the master, else 700 (as the 1.2 backfill).
+            'kode_arsip_id' => $l['kodeArsip'][mb_strtolower(trim(explode('/', $nomor)[0]))] ?? $l['kodeArsip']['700'] ?? null,
             'ppj_pegawai_id' => $irban && $tgl['tanggal_mulai'] ? ($l['ppj'][$irban->id.'|'.substr($tgl['tanggal_mulai'], 0, 4)] ?? null) : null,
             'nomor_lengkap' => $nomor, 'nomor_urut' => $nomorUrut, 'tahun' => $tgl['tanggal_spt'] ? (int) substr($tgl['tanggal_spt'], 0, 4) : null,
             'tanggal_spt' => $tgl['tanggal_spt'], 'tanggal_mulai' => $tgl['tanggal_mulai'], 'tanggal_selesai' => $tgl['tanggal_selesai'],

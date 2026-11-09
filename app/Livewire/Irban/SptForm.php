@@ -37,7 +37,7 @@ class SptForm extends Component
 {
     use WithFileUploads;
 
-    private const FIELDS = ['klasifikasi_id', 'pkpt_item_id', 'non_pkpt', 'jenis_penugasan_id', 'objek_ids', 'periode_diperiksa', 'uraian_untuk',
+    private const FIELDS = ['klasifikasi_id', 'kode_arsip_id', 'pkpt_item_id', 'non_pkpt', 'jenis_penugasan_id', 'objek_ids', 'periode_diperiksa', 'uraian_untuk',
         'tanggal_mulai', 'tanggal_selesai', 'ppj_pegawai_id', 'catatan_bagian_umum', 'diinput_oleh', 'personel'];
 
     /** Props whose change can change the uraian suggestion. */
@@ -47,6 +47,8 @@ class SptForm extends Component
     public ?int $sptId = null;
 
     public ?int $klasifikasi_id = null;
+
+    public ?int $kode_arsip_id = null;
 
     public ?int $pkpt_item_id = null;
 
@@ -116,7 +118,7 @@ class SptForm extends Component
         }
         $this->sptId = $spt->id;
         $this->fill([
-            'klasifikasi_id' => $spt->klasifikasi_id, 'pkpt_item_id' => $spt->pkpt_item_id, 'jenis_penugasan_id' => $spt->jenis_penugasan_id,
+            'klasifikasi_id' => $spt->klasifikasi_id, 'kode_arsip_id' => $spt->kode_arsip_id, 'pkpt_item_id' => $spt->pkpt_item_id, 'jenis_penugasan_id' => $spt->jenis_penugasan_id,
             'objek_ids' => $spt->objek()->pluck('objek.id')->all(), 'periode_diperiksa' => (string) $spt->periode_diperiksa,
             'uraian_untuk' => (string) $spt->uraian_untuk, 'tanggal_mulai' => (string) $spt->tanggal_mulai?->toDateString(),
             'tanggal_selesai' => (string) $spt->tanggal_selesai?->toDateString(), 'ppj_pegawai_id' => $spt->ppj_pegawai_id,

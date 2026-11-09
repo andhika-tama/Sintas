@@ -3,9 +3,12 @@
 namespace Tests\Feature\Spt;
 
 use App\Actions\Spt\AturNomorAwal;
+use App\Actions\Spt\CatatNomorManual;
+use App\Actions\Spt\TerimaPengajuan;
 use App\Enums\StatusPengajuan;
 use App\Models\Irban;
 use App\Models\Klasifikasi;
+use App\Models\KodeArsip;
 use App\Models\NomorCounter;
 use App\Models\Spt;
 use App\Models\User;
@@ -34,9 +37,24 @@ class PenomoranTest extends TestCase
         return Irban::factory()->create(['kode_nomor' => $kode]);
     }
 
-    private function ambil(Irban $irban, string $tanggal = '2026-05-04', ?Klasifikasi $klasifikasi = null): array
+    private function kode(string $kode = '700'): KodeArsip
     {
-        return DB::transaction(fn () => $this->penomoran()->ambil($irban, CarbonImmutable::parse($tanggal), $klasifikasi));
+        return KodeArsip::where('kode', $kode)->firstOrFail();
+    }
+
+    private function khusus(): Klasifikasi
+    {
+        return Klasifikasi::where('kode', 'KHUSUS')->firstOrFail();
+    }
+
+    private function ambil(Irban $irban, string $tanggal = '2026-05-04', ?Klasifikasi $klasifikasi = null, ?KodeArsip $kode = null): array
+    {
+        return DB::transaction(fn () => $this->penomoran()->ambil($irban, CarbonImmutable::parse($tanggal), $klasifikasi ?? $this->khusus(), $kode ?? $this->kode()));
+    }
+
+    private function pratinjau(Irban $irban, CarbonImmutable $tanggal, ?KodeArsip $kode = null): array
+    {
+        return $this->penomoran()->pratinjau($irban, $tanggal, $this->khusus(), $kode ?? $this->kode());
     }
 
     public function test_default_format_and_counter_auto_create(): void
@@ -84,7 +102,7 @@ class PenomoranTest extends TestCase
             DB::rollBack();
         }
         try {
-            $this->penomoran()->ambil(new Irban(['kode_nomor' => 'A']), CarbonImmutable::parse('2026-05-04'));
+            $this->penomoran()->ambil(new Irban(['kode_nomor' => 'A']), CarbonImmutable::parse('2026-05-04'), new Klasifikasi, new KodeArsip);
         } finally {
             for ($i = 0; $i < $level; $i++) {
                 DB::beginTransaction();
@@ -94,11 +112,10 @@ class PenomoranTest extends TestCase
 
     public function test_kode_arsip_and_custom_template(): void
     {
-        $settings = app(Settings::class);
-        $settings->set('penomoran.kode_arsip', '800.1');
-        $settings->set('penomoran.format', 'SPT-{nomor_urut}-{kode_irban}-{tahun}-{kode_arsip}');
+        $kode = KodeArsip::factory()->create(['kode' => '800.1']);
+        app(Settings::class)->set('penomoran.format', 'SPT-{nomor_urut}-{kode_irban}-{tahun}-{kode_arsip}');
 
-        $this->assertSame('SPT-1-IRB1-2026-800.1', $this->ambil($this->irban('IRB1'))['nomor_lengkap']);
+        $this->assertSame('SPT-1-IRB1-2026-800.1', $this->ambil($this->irban('IRB1'), kode: $kode)['nomor_lengkap']);
     }
 
     public function test_klasifikasi_placeholder_on_and_off(): void
@@ -168,11 +185,11 @@ class PenomoranTest extends TestCase
         $irban = $this->irban('A');
         $tanggal = CarbonImmutable::parse('2026-05-04');
 
-        $this->assertSame(['nomor_urut' => 1, 'nomor_lengkap' => '700/1/A/SPT/2026'], $this->penomoran()->pratinjau($irban, $tanggal));
+        $this->assertSame(['nomor_urut' => 1, 'nomor_lengkap' => '700/1/A/SPT/2026'], $this->pratinjau($irban, $tanggal));
         $this->assertSame(0, NomorCounter::count());
 
         $this->ambil($irban);
-        $pratinjau = $this->penomoran()->pratinjau($irban, $tanggal);
+        $pratinjau = $this->pratinjau($irban, $tanggal);
         $this->assertSame(2, NomorCounter::first()->nomor_terakhir + 1);
         $berikut = $this->ambil($irban);
         $this->assertSame($pratinjau, ['nomor_urut' => $berikut['nomor_urut'], 'nomor_lengkap' => $berikut['nomor_lengkap']]);
@@ -213,7 +230,7 @@ class PenomoranTest extends TestCase
 
         $this->assertRejected(fn () => (new AturNomorAwal)->handle($admin, 2026, null, -1), 'nomor', 'Nomor awal minimal 0.');
 
-        $hasil = DB::transaction(fn () => $this->penomoran()->ambil($irban, CarbonImmutable::parse('2026-05-04')));
+        $hasil = $this->ambil($irban);
         Spt::factory()->for($irban)->diterima()->create(['nomor_urut' => $hasil['nomor_urut'], 'nomor_lengkap' => $hasil['nomor_lengkap'], 'nomor_counter_id' => $hasil['counter']->id]);
         $this->assertRejected(fn () => (new AturNomorAwal)->handle($admin, 2026, null, 900), 'nomor', 'Nomor awal hanya bisa diatur sebelum ada nomor yang terbit pada register ini.');
 
@@ -237,12 +254,13 @@ class PenomoranTest extends TestCase
     }
 
     /** Takes the next number and issues an SPT with it, as TerimaPengajuan does. */
-    private function terbit(Irban $irban, string $tanggal = '2026-05-04'): array
+    private function terbit(Irban $irban, string $tanggal = '2026-05-04', ?KodeArsip $kode = null): array
     {
-        $hasil = $this->ambil($irban, $tanggal);
+        $hasil = $this->ambil($irban, $tanggal, kode: $kode);
         Spt::factory()->for($irban)->create([
             'status_pengajuan' => StatusPengajuan::Diterima, 'nomor_urut' => $hasil['nomor_urut'],
             'nomor_lengkap' => $hasil['nomor_lengkap'], 'nomor_counter_id' => $hasil['counter']->id, 'tahun' => (int) substr($tanggal, 0, 4),
+            'kode_arsip_id' => ($kode ?? $this->kode())->id,
         ]);
 
         return $hasil;
@@ -272,7 +290,7 @@ class PenomoranTest extends TestCase
         foreach ([$a, $b, $c] as $irban) {
             $this->assertSame(3, NomorCounter::where(['tahun' => 2026, 'scope' => "irban:{$irban->id}"])->value('nomor_terakhir'));
         }
-        $this->assertSame(['nomor_urut' => 4, 'nomor_lengkap' => '700/4/A/SPT/2026'], $this->penomoran()->pratinjau($a, CarbonImmutable::parse('2026-05-04')));
+        $this->assertSame(['nomor_urut' => 4, 'nomor_lengkap' => '700/4/A/SPT/2026'], $this->pratinjau($a, CarbonImmutable::parse('2026-05-04')));
         $this->assertSame('700/4/A/SPT/2026', $this->terbit($a)['nomor_lengkap']);
         $this->assertSame('700/4/C/SPT/2026', $this->terbit($c)['nomor_lengkap']);
         $this->assertSame(5, Spt::count());
@@ -309,7 +327,7 @@ class PenomoranTest extends TestCase
 
         // Control: saving without a scope/reset change leaves the registers alone.
         $sebelum = NomorCounter::orderBy('id')->pluck('nomor_terakhir', 'id')->all();
-        $this->simpanPenomoran(['penomoran.kode_arsip' => '700']);
+        $this->simpanPenomoran(['penomoran.klasifikasi_di_nomor' => false]);
         $this->assertSame($sebelum, NomorCounter::orderBy('id')->pluck('nomor_terakhir', 'id')->all());
     }
 
@@ -346,19 +364,86 @@ class PenomoranTest extends TestCase
     {
         $settings = app(Settings::class);
         $a = $this->irban('A');
+        $nol = KodeArsip::factory()->create(['kode' => '0']);
         $settings->set('penomoran.format', '{nomor_urut}{kode_arsip}/{tahun}');
-        $settings->set('penomoran.kode_arsip', '0');
-        $this->assertSame('10/2026', $this->terbit($a)['nomor_lengkap']);
+        $this->assertSame('10/2026', $this->terbit($a, kode: $nol)['nomor_lengkap']);
         NomorCounter::first()->forceFill(['nomor_terakhir' => 9])->save();
 
         // The new format rebuilds "10/2026" at nomor 10, already issued under the old format.
         $settings->set('penomoran.format', '{nomor_urut}/{tahun}');
         $tanggal = CarbonImmutable::parse('2026-05-04');
-        $this->assertSame(['nomor_urut' => 11, 'nomor_lengkap' => '11/2026'], $this->penomoran()->pratinjau($a, $tanggal));
+        $this->assertSame(['nomor_urut' => 11, 'nomor_lengkap' => '11/2026'], $this->pratinjau($a, $tanggal, $nol));
         $this->assertSame(9, NomorCounter::first()->nomor_terakhir);
-        $hasil = $this->terbit($a);
+        $hasil = $this->terbit($a, kode: $nol);
         $this->assertSame(['nomor_urut' => 11, 'nomor_lengkap' => '11/2026'], ['nomor_urut' => $hasil['nomor_urut'], 'nomor_lengkap' => $hasil['nomor_lengkap']]);
         $this->assertSame(11, NomorCounter::first()->nomor_terakhir);
+    }
+
+    /** 1.2 Task 2: one register for every kode arsip; the kode only changes the prefix. */
+    public function test_kode_arsip_berbeda_melanjutkan_urutan(): void
+    {
+        $irban = $this->irban('INSPEKTORAT-I');
+        $this->assertSame('700/1/INSPEKTORAT-I/SPT/2026', $this->terbit($irban)['nomor_lengkap']);
+
+        $tanggal = CarbonImmutable::parse('2026-05-04');
+        $this->assertSame(['nomor_urut' => 2, 'nomor_lengkap' => '800/2/INSPEKTORAT-I/SPT/2026'], $this->pratinjau($irban, $tanggal, $this->kode('800')));
+        $hasil = $this->terbit($irban, kode: $this->kode('800'));
+        $this->assertSame([2, '800/2/INSPEKTORAT-I/SPT/2026'], [$hasil['nomor_urut'], $hasil['nomor_lengkap']]);
+        $this->assertSame(1, NomorCounter::count());
+    }
+
+    public function test_ubah_kode_master_tidak_mengubah_nomor_terbit(): void
+    {
+        $irban = $this->irban('INSPEKTORAT-I');
+        $this->terbit($irban);
+        $this->kode()->update(['kode' => '701']);
+
+        $this->assertSame('700/1/INSPEKTORAT-I/SPT/2026', Spt::sole()->nomor_lengkap);
+        $this->assertSame('701/2/INSPEKTORAT-I/SPT/2026', $this->terbit($irban, kode: $this->kode('701'))['nomor_lengkap']);
+    }
+
+    /** Accepting a pengajuan and recording a manual number both take the kode of that SPT / of the form. */
+    public function test_terima_dan_catat_manual_memakai_kode_arsip_spt(): void
+    {
+        $this->travelTo(CarbonImmutable::parse('2026-05-04 10:00', 'Asia/Jakarta'));
+        $irban = $this->irban('INSPEKTORAT-I');
+        $bu = User::factory()->bagianUmum()->create();
+        $spt = Spt::factory()->menungguNomor()->create(['irban_id' => $irban->id, 'kode_arsip_id' => $this->kode('900')->id]);
+
+        $this->assertSame('900/1/INSPEKTORAT-I/SPT/2026', app(TerimaPengajuan::class)->handle($bu, $spt)->nomor_lengkap);
+
+        $manual = app(CatatNomorManual::class)->handle($bu, [
+            'irban_id' => $irban->id, 'klasifikasi_id' => $this->khusus()->id, 'kode_arsip_id' => $this->kode('800')->id, 'uraian_untuk' => 'Mendesak',
+            'tanggal_mulai' => '2026-05-05', 'tanggal_selesai' => '2026-05-06', 'alasan' => 'Perintah mendadak dari Bupati',
+        ]);
+        $this->assertSame('800/2/INSPEKTORAT-I/SPT/2026', $manual->nomor_lengkap);
+        $this->assertSame($this->kode('800')->id, $manual->kode_arsip_id);
+    }
+
+    public function test_migrasi_mengisi_kode_arsip(): void
+    {
+        $this->assertSame(['700' => 'Pengawasan Umum', '800' => 'Kepegawaian', '900' => 'Anggaran'], KodeArsip::orderBy('kode')->pluck('nama', 'kode')->all());
+        // isi() is the data half of the migration (no DDL, so safe inside RefreshDatabase on MySQL) and is idempotent.
+        $migrasi = require database_path('migrations/2026_12_20_000002_create_kode_arsip_table.php');
+
+        // An old setting outside the three rows becomes its own row (kode = nama); every SPT without a kode gets it, the setting row goes.
+        DB::table('settings')->insert(['key' => 'penomoran.kode_arsip', 'value' => json_encode('800.1'), 'created_at' => now(), 'updated_at' => now()]);
+        $lama = Spt::factory()->diterima()->create(['kode_arsip_id' => null]);
+        $sudah = Spt::factory()->create(['kode_arsip_id' => $this->kode('900')->id]);
+        $migrasi->isi();
+        $this->assertSame(['kode' => '800.1', 'nama' => '800.1'], $lama->fresh()->kodeArsip->only(['kode', 'nama']));
+        $this->assertSame('900', $sudah->fresh()->kodeArsip->kode);
+        $this->assertDatabaseMissing('settings', ['key' => 'penomoran.kode_arsip']);
+        $this->assertSame(4, KodeArsip::count());
+
+        // A setting equal to an existing kode reuses that row; no setting means 700.
+        DB::table('settings')->insert(['key' => 'penomoran.kode_arsip', 'value' => json_encode('800'), 'created_at' => now(), 'updated_at' => now()]);
+        $delapan = Spt::factory()->create(['kode_arsip_id' => null]);
+        $migrasi->isi();
+        $tujuh = Spt::factory()->create(['kode_arsip_id' => null]);
+        $migrasi->isi();
+        $this->assertSame(['800', '700'], [$delapan->fresh()->kodeArsip->kode, $tujuh->fresh()->kodeArsip->kode]);
+        $this->assertSame(4, KodeArsip::count());
     }
 
     private function assertRejected(callable $fn, string $key, string $message): void

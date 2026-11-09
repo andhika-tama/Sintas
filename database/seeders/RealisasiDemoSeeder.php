@@ -6,6 +6,7 @@ use App\Enums\StatusPengajuan;
 use App\Enums\StatusPkpt;
 use App\Models\Irban;
 use App\Models\Klasifikasi;
+use App\Models\KodeArsip;
 use App\Models\Objek;
 use App\Models\Pegawai;
 use App\Models\PkptItem;
@@ -24,6 +25,7 @@ class RealisasiDemoSeeder extends Seeder
     {
         $user = User::where('username', 'irban1')->first();
         $reguler = Klasifikasi::where('kode', 'REGULER')->first();
+        $kode = KodeArsip::where('kode', '700')->firstOrFail();
         $hari = CarbonImmutable::now('Asia/Jakarta')->startOfDay();
         if (app()->isProduction() || ! $user || ! $reguler || Spt::where('klasifikasi_id', $reguler->id)->whereNotNull('ditandai_selesai_pada')->exists()) {
             return;
@@ -45,10 +47,10 @@ class RealisasiDemoSeeder extends Seeder
             for ($s = 0; $s < ($n % 3 === 1 ? 1 : 2); $s++) {
                 $mulai = CarbonImmutable::parse($i->tanggal_mulai)->addDays($s * 7);
                 $selesai = $mulai->addDays(9);
-                DB::transaction(function () use ($irban, $reguler, $i, $mulai, $selesai, $user, $penginput, $penomoran, $kecamatan, &$k) {
-                    $nomor = $penomoran->ambil($irban, $mulai, $reguler);
+                DB::transaction(function () use ($irban, $reguler, $kode, $i, $mulai, $selesai, $user, $penginput, $penomoran, $kecamatan, &$k) {
+                    $nomor = $penomoran->ambil($irban, $mulai, $reguler, $kode);
                     $spt = (new Spt)->forceFill([
-                        'irban_id' => $irban->id, 'klasifikasi_id' => $reguler->id, 'pkpt_item_id' => $i->id, 'jenis_penugasan_id' => $i->jenis_penugasan_id,
+                        'irban_id' => $irban->id, 'klasifikasi_id' => $reguler->id, 'kode_arsip_id' => $kode->id, 'pkpt_item_id' => $i->id, 'jenis_penugasan_id' => $i->jenis_penugasan_id,
                         'uraian_untuk' => 'Pemeriksaan reguler sesuai PKPT.', 'periode_diperiksa' => 'Tahun Anggaran '.($mulai->year - 1),
                         'tanggal_mulai' => $mulai, 'tanggal_selesai' => $selesai, 'status_pengajuan' => StatusPengajuan::Diterima,
                         'dibuat_oleh' => $user->id, 'diinput_oleh' => $penginput, 'diajukan_pada' => $mulai->subDays(10),

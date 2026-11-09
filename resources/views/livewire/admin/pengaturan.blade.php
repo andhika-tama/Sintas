@@ -15,9 +15,6 @@
                 </div>
                 <x-ui.input label="Format nomor" name="penomoran_format" wire:model="v.penomoran.format" required :error="$err('penomoran.format')"
                     helper="Wajib memuat {nomor_urut} dan {tahun}. Penanda lain: {kode_arsip}, {kode_irban}." />
-                <div class="grid gap-4 sm:grid-cols-2">
-                    <x-ui.input label="Kode arsip" name="penomoran_kode_arsip" wire:model="v.penomoran.kode_arsip" required :error="$err('penomoran.kode_arsip')" />
-                </div>
                 <x-ui.select label="Cakupan nomor urut" name="penomoran_scope" wire:model="v.penomoran.scope" required :error="$err('penomoran.scope')"
                     :options="['global' => 'Satu urutan untuk semua Irban', 'per_irban' => 'Urutan terpisah per Irban']" />
                 <x-ui.switch label="Atur ulang nomor urut tiap tahun" name="penomoran_reset_tahunan" wire:model="v.penomoran.reset_tahunan" />

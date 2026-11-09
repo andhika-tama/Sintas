@@ -8,6 +8,7 @@ use App\Enums\StatusPengajuan;
 use App\Enums\SumberSpt;
 use App\Models\JenisPenugasan;
 use App\Models\Klasifikasi;
+use App\Models\KodeArsip;
 use App\Models\Objek;
 use App\Models\Pegawai;
 use App\Models\Pkpt;
@@ -36,7 +37,7 @@ use Illuminate\Validation\ValidationException;
  * Irban saves a pengajuan SPT as draf or submits it (PRD §5, §7, §9.2).
  *
  * handle(User $user, ?Spt $spt, array $data, 'draf'|'ajukan', ?UploadedFile $lampiran = null, bool $hapusLampiran = false): Spt
- *  $data: klasifikasi_id, pkpt_item_id, non_pkpt (bool, informational: no item is the same thing), jenis_penugasan_id, objek_ids (int[]),
+ *  $data: klasifikasi_id, kode_arsip_id, pkpt_item_id, non_pkpt (bool, informational: no item is the same thing), jenis_penugasan_id, objek_ids (int[]),
  *         periode_diperiksa, uraian_untuk, tanggal_mulai, tanggal_selesai (Y-m-d), ppj_pegawai_id, catatan_bagian_umum,
  *         diinput_oleh (pegawai id), personel: ordered list of [pegawai_id, peran, sumber 'tim'|'tambahan', tim_id|null, ikut bool]
  *         (ikut=false rows are dropped before validation and storage).
@@ -251,6 +252,11 @@ class SimpanSpt
         if (! $klasifikasi) {
             $e['klasifikasi_id'] = 'Pilih klasifikasi.';
         }
+        // K4: the Irban picks the kode arsip; required on submit, an unknown id counts as none.
+        $kodeArsip = KodeArsip::find($this->int($d['kode_arsip_id'] ?? null))?->id;
+        if ($ajukan && ! $kodeArsip) {
+            $e['kode_arsip_id'] = 'Pilih kode arsip.';
+        }
 
         // Non-PKPT is "no item chosen"; it is only accepted when the klasifikasi does not require an item.
         $item = null;
@@ -330,7 +336,7 @@ class SimpanSpt
         }
 
         return [[
-            'klasifikasi_id' => $klasifikasi->id, 'pkpt_item_id' => $item?->id, 'jenis_penugasan_id' => $jenisId, 'ppj_pegawai_id' => $ppj,
+            'klasifikasi_id' => $klasifikasi->id, 'kode_arsip_id' => $kodeArsip, 'pkpt_item_id' => $item?->id, 'jenis_penugasan_id' => $jenisId, 'ppj_pegawai_id' => $ppj,
             'periode_diperiksa' => $periode ?: null, 'uraian_untuk' => $uraian ?: null, 'tanggal_mulai' => $mulai, 'tanggal_selesai' => $selesai,
             'catatan_bagian_umum' => $catatan ?: null, 'diinput_oleh' => $diinput,
         ], $objekIds, $personel];

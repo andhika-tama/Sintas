@@ -8,6 +8,7 @@ use App\Enums\StatusPengajuan;
 use App\Models\Irban;
 use App\Models\JenisPenugasan;
 use App\Models\Klasifikasi;
+use App\Models\KodeArsip;
 use App\Models\User;
 use App\Services\ColorRules;
 use App\Services\Penomoran;
@@ -73,6 +74,7 @@ class KinerjaSeeder extends Seeder
         $jenis = collect(range(0, 5))->map(fn ($i) => JenisPenugasan::firstOrCreate(['nama' => 'Jenis Kinerja '.($i + 1)],
             ['warna' => ColorRules::SWATCHES[$i]['hex'], 'warna_teks' => ColorRules::SWATCHES[$i]['label']])->id)->all();
         $klasifikasi = Klasifikasi::pluck('id', 'kode');
+        $kodeArsip = KodeArsip::where('kode', '700')->firstOrFail();
 
         // Objek: 20 kecamatan (each with 3 desa, a sekolah and a puskesmas), 15 dinas/badan, 2 BUMD; per irban 4 kecamatan + 3–4 dinas/BUMD.
         $objekIrban = array_fill(0, 5, []);
@@ -141,10 +143,10 @@ class KinerjaSeeder extends Seeder
                 }
                 $tim = $pegawai($i);
                 $this->tambah('spt', [
-                    'id' => $sptId, 'irban_id' => $irban[$i]->id, 'klasifikasi_id' => $klasifikasi[$kode], 'pkpt_item_id' => $itemId, 'jenis_penugasan_id' => $j,
+                    'id' => $sptId, 'irban_id' => $irban[$i]->id, 'klasifikasi_id' => $klasifikasi[$kode], 'kode_arsip_id' => $kodeArsip->id, 'pkpt_item_id' => $itemId, 'jenis_penugasan_id' => $j,
                     'ppj_pegawai_id' => $tim[0], 'periode_diperiksa' => 'Tahun Anggaran '.($tahun - 1), 'uraian_untuk' => "Penugasan kinerja {$tahun} nomor {$n}.",
                     'tanggal_mulai' => $mulai->toDateString(), 'tanggal_selesai' => $selesai->toDateString(), 'status_pengajuan' => StatusPengajuan::Diterima->value,
-                    'nomor_urut' => $n, 'nomor_lengkap' => $penomoran->format($n, $irban[$i], $mulai, null), 'nomor_counter_id' => $counter, 'tahun' => $tahun,
+                    'nomor_urut' => $n, 'nomor_lengkap' => $penomoran->format($n, $irban[$i], $mulai, null, $kodeArsip), 'nomor_counter_id' => $counter, 'tahun' => $tahun,
                     'tanggal_spt' => $mulai->toDateString(), 'diajukan_pada' => $mulai->subDays(3)->format('Y-m-d 09:00:00'), 'sumber' => 'sistem',
                     'diinput_oleh' => $tim[1], 'dibuat_oleh' => $user['irban'.($i + 1)]->id,
                     'nomor_lhp' => $selesaiDitandai ? "700/LHP/{$sptId}/{$tahun}" : null, 'tanggal_lhp' => $selesaiDitandai?->toDateString(),
@@ -165,7 +167,7 @@ class KinerjaSeeder extends Seeder
                 $mulai = $sekarang->startOfDay()->addDays($this->angka(7, 40));
                 $tim = $pegawai($i);
                 $this->tambah('spt', [
-                    'id' => $sptId, 'irban_id' => $irban[$i]->id, 'klasifikasi_id' => $klasifikasi['KHUSUS'], 'pkpt_item_id' => null, 'jenis_penugasan_id' => $jenis[$n % count($jenis)],
+                    'id' => $sptId, 'irban_id' => $irban[$i]->id, 'klasifikasi_id' => $klasifikasi['KHUSUS'], 'kode_arsip_id' => $kodeArsip->id, 'pkpt_item_id' => null, 'jenis_penugasan_id' => $jenis[$n % count($jenis)],
                     'ppj_pegawai_id' => $tim[0], 'periode_diperiksa' => 'Tahun Anggaran '.($tahunIni - 1), 'uraian_untuk' => "Pengajuan kinerja {$status->value} {$n}.",
                     'tanggal_mulai' => $mulai->toDateString(), 'tanggal_selesai' => $mulai->addDays(9)->toDateString(), 'status_pengajuan' => $status->value,
                     'nomor_urut' => null, 'nomor_lengkap' => null, 'nomor_counter_id' => null, 'tahun' => null, 'tanggal_spt' => null,

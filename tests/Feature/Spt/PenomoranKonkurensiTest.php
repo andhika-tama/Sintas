@@ -59,9 +59,10 @@ class PenomoranKonkurensiTest extends TestCase
         $userId = $db->table('users')->insertGetId(['name' => 'Bagian Umum', 'username' => 'bu', 'email' => 'bu@example.test', 'password' => 'x',
             'role' => 'bagian_umum', 'created_at' => now(), 'updated_at' => now()]);
         $klasifikasi = $db->table('klasifikasi')->where('kode', 'KHUSUS')->value('id');
+        $kode = $db->table('kode_arsip')->where('kode', '700')->value('id');
         $sptIds = [];
         for ($i = 0; $i < 5; $i++) {
-            $sptIds[] = $db->table('spt')->insertGetId(['irban_id' => $irbanId, 'klasifikasi_id' => $klasifikasi, 'status_pengajuan' => 'menunggu_nomor',
+            $sptIds[] = $db->table('spt')->insertGetId(['irban_id' => $irbanId, 'klasifikasi_id' => $klasifikasi, 'kode_arsip_id' => $kode, 'status_pengajuan' => 'menunggu_nomor',
                 'diajukan_pada' => now(), 'dibuat_oleh' => $userId, 'created_at' => now(), 'updated_at' => now()]);
         }
 

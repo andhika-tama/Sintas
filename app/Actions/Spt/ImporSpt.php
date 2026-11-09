@@ -80,7 +80,7 @@ class ImporSpt
 
     private function simpan(User $admin, array $d, string $berkas): void
     {
-        $spt = new Spt(array_intersect_key($d, array_flip(['irban_id', 'klasifikasi_id', 'pkpt_item_id', 'jenis_penugasan_id', 'ppj_pegawai_id',
+        $spt = new Spt(array_intersect_key($d, array_flip(['irban_id', 'klasifikasi_id', 'kode_arsip_id', 'pkpt_item_id', 'jenis_penugasan_id', 'ppj_pegawai_id',
             'periode_diperiksa', 'uraian_untuk', 'tanggal_mulai', 'tanggal_selesai'])));
         $spt->forceFill([
             'status_pengajuan' => StatusPengajuan::Diterima, 'sumber' => SumberSpt::Impor, 'dibuat_oleh' => $admin->id, 'diinput_oleh' => null,

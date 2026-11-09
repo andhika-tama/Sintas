@@ -12,6 +12,7 @@ use App\Models\Irban;
 use App\Models\IrbanTahunan;
 use App\Models\JenisPenugasan;
 use App\Models\Klasifikasi;
+use App\Models\KodeArsip;
 use App\Models\Objek;
 use App\Models\Pegawai;
 use App\Models\Pkpt;
@@ -75,7 +76,7 @@ class NotifikasiPengajuanRevisiTest extends TestCase
     private function data(): array
     {
         return [
-            'klasifikasi_id' => Klasifikasi::where('kode', 'REGULER')->value('id'), 'pkpt_item_id' => $this->item->id,
+            'klasifikasi_id' => Klasifikasi::where('kode', 'REGULER')->value('id'), 'kode_arsip_id' => KodeArsip::where('kode', '700')->value('id'), 'pkpt_item_id' => $this->item->id,
             'objek_ids' => [Objek::factory()->create()->id], 'periode_diperiksa' => 'Tahun Anggaran 2025',
             'uraian_untuk' => 'Melaksanakan Reviu LKjIP.', 'tanggal_mulai' => '2026-03-02', 'tanggal_selesai' => '2026-03-10',
             'ppj_pegawai_id' => $this->ppj->id, 'diinput_oleh' => $this->anggota->id,

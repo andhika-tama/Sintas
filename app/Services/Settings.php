@@ -17,7 +17,6 @@ class Settings
 {
     public const DEFAULTS = [
         'penomoran.format' => '{kode_arsip}/{nomor_urut}/{kode_irban}/SPT/{tahun}',
-        'penomoran.kode_arsip' => '700',
         'penomoran.scope' => 'global',
         'penomoran.reset_tahunan' => true,
         'penomoran.klasifikasi_di_nomor' => false,
@@ -39,7 +38,7 @@ class Settings
 
     /** Settings page card => the keys it owns. */
     public const GROUPS = [
-        'penomoran' => ['penomoran.format', 'penomoran.kode_arsip', 'penomoran.scope', 'penomoran.reset_tahunan', 'penomoran.klasifikasi_di_nomor'],
+        'penomoran' => ['penomoran.format', 'penomoran.scope', 'penomoran.reset_tahunan', 'penomoran.klasifikasi_di_nomor'],
         'penugasan' => ['penugasan.hitungan_hari', 'penanda.batas_terlambat_hari'],
         'rekap' => ['rekap.dasar_triwulan'],
         'pkpt' => ['pkpt.draf_memblokir'],
@@ -169,7 +168,6 @@ class Settings
     {
         return match ($key) {
             'penomoran.format' => ['required', 'string', 'max:150', self::contains('{nomor_urut}', '{tahun}'), self::placeholderSah(), self::kodeIrbanPerIrban()],
-            'penomoran.kode_arsip' => ['required', 'string', 'max:20'],
             'penomoran.scope' => ['required', 'in:global,per_irban'],
             'penugasan.hitungan_hari' => ['required', 'in:kalender,kerja'],
             'rekap.dasar_triwulan' => ['required', 'in:tanggal_selesai,tanggal_mulai,tanggal_lhp'],

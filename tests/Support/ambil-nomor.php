@@ -7,6 +7,8 @@
 
 use App\Actions\Spt\TerimaPengajuan;
 use App\Models\Irban;
+use App\Models\Klasifikasi;
+use App\Models\KodeArsip;
 use App\Models\Spt;
 use App\Models\User;
 use App\Services\Penomoran;
@@ -32,7 +34,8 @@ try {
         $hasil = app(TerimaPengajuan::class)->handle(User::findOrFail((int) $argv[5]), Spt::findOrFail((int) $argv[4]))->only(['nomor_urut', 'nomor_lengkap']);
     } else {
         $irban = Irban::findOrFail((int) $argv[1]);
-        $hasil = DB::transaction(fn () => app(Penomoran::class)->ambil($irban, CarbonImmutable::parse($argv[2])));
+        $hasil = DB::transaction(fn () => app(Penomoran::class)->ambil($irban, CarbonImmutable::parse($argv[2]),
+            Klasifikasi::where('kode', 'KHUSUS')->firstOrFail(), KodeArsip::where('kode', '700')->firstOrFail()));
     }
 } catch (Throwable $e) {
     fwrite(STDERR, $e::class.': '.$e->getMessage());

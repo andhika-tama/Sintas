@@ -18,13 +18,15 @@ class SettingsServiceTest extends TestCase
     {
         $s = app(Settings::class);
         $this->assertSame('{kode_arsip}/{nomor_urut}/{kode_irban}/SPT/{tahun}', $s->get('penomoran.format'));
-        $this->assertSame('700', $s->get('penomoran.kode_arsip'));
         $this->assertSame(14, $s->get('penanda.batas_terlambat_hari'));
         $this->assertTrue($s->get('penomoran.reset_tahunan'));
         $this->assertSame('Lainnya', last($s->get('kendala.kategori')));
-        $this->assertCount(19, Settings::DEFAULTS);
+        $this->assertCount(18, Settings::DEFAULTS);
         $this->assertNotContains('penomoran.kode_sekretariat', Settings::GROUPS['penomoran']);
         $this->assertArrayNotHasKey('penomoran.kode_sekretariat', Settings::DEFAULTS);
+        // 1.2 Task 2: the kode arsip comes from each SPT (master kode_arsip), no longer from one setting.
+        $this->assertArrayNotHasKey('penomoran.kode_arsip', Settings::DEFAULTS);
+        $this->assertNotContains('penomoran.kode_arsip', Settings::GROUPS['penomoran']);
         $this->assertSame('', $s->get('kontak.peta_url'));
     }
 

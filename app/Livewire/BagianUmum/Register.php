@@ -11,6 +11,7 @@ use App\Livewire\Concerns\MintaEkspor;
 use App\Models\Irban;
 use App\Models\JenisPenugasan;
 use App\Models\Klasifikasi;
+use App\Models\KodeArsip;
 use App\Models\NomorCounter;
 use App\Models\Spt;
 use App\Services\Penomoran;
@@ -55,7 +56,7 @@ class Register extends Component
 
     public bool $showManual = false;
 
-    /** @var array<string, string> irban_id, klasifikasi_id, jenis_penugasan_id, uraian_untuk, tanggal_mulai, tanggal_selesai, alasan */
+    /** @var array<string, string> irban_id, klasifikasi_id, kode_arsip_id, jenis_penugasan_id, uraian_untuk, tanggal_mulai, tanggal_selesai, alasan */
     public array $manual = [];
 
     /** Display only: Penomoran::pratinjau when the form is filled; the issued number is always taken fresh. */
@@ -98,7 +99,7 @@ class Register extends Component
     public function bukaManual(): void
     {
         Gate::authorize('kelolaNomor', Spt::class);
-        $this->manual = ['irban_id' => '', 'klasifikasi_id' => '', 'jenis_penugasan_id' => '', 'uraian_untuk' => '', 'tanggal_mulai' => '', 'tanggal_selesai' => '', 'alasan' => '', 'nomor_sppd' => ''];
+        $this->manual = ['irban_id' => '', 'klasifikasi_id' => '', 'kode_arsip_id' => '', 'jenis_penugasan_id' => '', 'uraian_untuk' => '', 'tanggal_mulai' => '', 'tanggal_selesai' => '', 'alasan' => '', 'nomor_sppd' => ''];
         $this->pratinjau = '';
         $this->resetErrorBag();
         $this->showManual = true;
@@ -193,8 +194,10 @@ class Register extends Component
     private function hitungPratinjau(): void
     {
         $irban = Irban::find((int) ($this->manual['irban_id'] ?? 0));
-        $this->pratinjau = $irban
-            ? app(Penomoran::class)->pratinjau($irban, CarbonImmutable::now('Asia/Jakarta'), Klasifikasi::find((int) ($this->manual['klasifikasi_id'] ?? 0)))['nomor_lengkap']
+        $klasifikasi = Klasifikasi::find((int) ($this->manual['klasifikasi_id'] ?? 0));
+        $kode = KodeArsip::find((int) ($this->manual['kode_arsip_id'] ?? 0));
+        $this->pratinjau = $irban && $klasifikasi && $kode
+            ? app(Penomoran::class)->pratinjau($irban, CarbonImmutable::now('Asia/Jakarta'), $klasifikasi, $kode)['nomor_lengkap']
             : '';
     }
 

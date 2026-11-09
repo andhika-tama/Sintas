@@ -48,13 +48,13 @@ class PengaturanTest extends TestCase
     {
         $s = app(Settings::class);
         Livewire::actingAs($this->admin())->test(Pengaturan::class)
-            ->set('v.penomoran.kode_arsip', '800')
+            ->set('v.penomoran.format', '{kode_arsip}/{nomor_urut}/SPT/{tahun}')
             ->set('v.upload.maks_mb', 50)
             ->call('save', 'penomoran')
             ->assertHasNoErrors()
             ->assertDispatched('toast');
 
-        $this->assertSame('800', $s->get('penomoran.kode_arsip'));
+        $this->assertSame('{kode_arsip}/{nomor_urut}/SPT/{tahun}', $s->get('penomoran.format'));
         $this->assertSame(10, $s->get('upload.maks_mb'));
         $this->assertDatabaseMissing('settings', ['key' => 'upload.maks_mb']);
     }
@@ -110,8 +110,9 @@ class PengaturanTest extends TestCase
 
     public function test_saved_values_are_loaded(): void
     {
-        app(Settings::class)->set('penomoran.kode_arsip', '123');
-        Livewire::actingAs($this->admin())->test(Pengaturan::class)->assertSet('v.penomoran.kode_arsip', '123');
+        app(Settings::class)->set('penomoran.format', '{nomor_urut}/{tahun}');
+        Livewire::actingAs($this->admin())->test(Pengaturan::class)->assertSet('v.penomoran.format', '{nomor_urut}/{tahun}')
+            ->assertDontSeeHtml('name="penomoran_kode_arsip"');
     }
 
     public function test_demoted_admin_is_rejected_on_every_action_and_nothing_changes(): void
@@ -120,7 +121,7 @@ class PengaturanTest extends TestCase
         // A forbidden call leaves the test component unusable, so mount a fresh one per action, then demote.
         $demoted = function (string $method, ...$args) use ($admin) {
             $admin->role = Role::Admin;
-            $c = Livewire::actingAs($admin)->test(Pengaturan::class)->set('v.penomoran.kode_arsip', '999')->set('v.upload.maks_mb', 77);
+            $c = Livewire::actingAs($admin)->test(Pengaturan::class)->set('v.penomoran.format', '{nomor_urut}/X/{tahun}')->set('v.upload.maks_mb', 77);
             $admin->role = Role::Irban;
             $c->call($method, ...$args)->assertForbidden();
         };

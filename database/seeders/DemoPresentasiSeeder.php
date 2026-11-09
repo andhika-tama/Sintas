@@ -23,6 +23,7 @@ use App\Models\IrbanTahunan;
 use App\Models\IrbanWilayah;
 use App\Models\JenisPenugasan;
 use App\Models\Klasifikasi;
+use App\Models\KodeArsip;
 use App\Models\Objek;
 use App\Models\Pegawai;
 use App\Models\Pkpt;
@@ -175,7 +176,7 @@ class DemoPresentasiSeeder extends Seeder
         $p = $t['pegawai'];
 
         return [
-            'klasifikasi_id' => $k->id, 'pkpt_item_id' => $item?->id, 'jenis_penugasan_id' => $item?->jenis_penugasan_id ?? JenisPenugasan::orderBy('id')->value('id'),
+            'klasifikasi_id' => $k->id, 'kode_arsip_id' => KodeArsip::where('kode', '700')->value('id'), 'pkpt_item_id' => $item?->id, 'jenis_penugasan_id' => $item?->jenis_penugasan_id ?? JenisPenugasan::orderBy('id')->value('id'),
             'objek_ids' => [$objek], 'periode_diperiksa' => 'Tahun Anggaran '.($mulai->year - 1), 'uraian_untuk' => $uraian,
             'tanggal_mulai' => $mulai->toDateString(), 'tanggal_selesai' => $selesai->toDateString(), 'ppj_pegawai_id' => $p[0], 'diinput_oleh' => $p[1],
             'personel' => [['pegawai_id' => $p[1], 'peran' => 'ketua'], ['pegawai_id' => $p[2], 'peran' => 'anggota'], ['pegawai_id' => $p[3], 'peran' => 'anggota']],

@@ -12,6 +12,7 @@ use App\Models\Irban;
 use App\Models\IrbanTahunan;
 use App\Models\JenisPenugasan;
 use App\Models\Klasifikasi;
+use App\Models\KodeArsip;
 use App\Models\Objek;
 use App\Models\Pegawai;
 use App\Models\Pkpt;
@@ -112,6 +113,7 @@ class SptFormTest extends TestCase
         return $this->form()
             ->set('diinput_oleh', $this->budi->id)
             ->set('klasifikasi_id', $this->klas('REGULER'))
+            ->set('kode_arsip_id', KodeArsip::where('kode', '700')->value('id'))
             ->set('pkpt_item_id', $this->item->id)
             ->set('objek_ids', [$this->objek->id])
             ->set('periode_diperiksa', 'Tahun Anggaran 2025')
@@ -303,7 +305,7 @@ class SptFormTest extends TestCase
 
         $this->actingAs($this->user)->get(route('irban.spt.ubah', $spt))->assertOk()->assertSee('Periode pemeriksaan belum tepat.');
         $this->form($spt)->assertSet('sptId', $spt->id)->assertSet('periode_diperiksa', 'Tahun Anggaran 2025')
-            ->assertSet('personel.0.pegawai_id', $this->budi->id)->assertSet('personel.0.peran', 'ketua');
+            ->assertSet('kode_arsip_id', $spt->kode_arsip_id)->assertSet('personel.0.pegawai_id', $this->budi->id)->assertSet('personel.0.peran', 'ketua');
     }
 
     public function test_draf_saved_as_non_pkpt_reloads_checked(): void

@@ -27,7 +27,7 @@ class TerimaPengajuan
 
         return $this->putuskan($user, $spt, function (Spt $spt) {
             $tanggal = CarbonImmutable::now('Asia/Jakarta')->startOfDay();
-            $n = $this->penomoran->ambil($spt->irban, $tanggal, $spt->klasifikasi);
+            $n = $this->penomoran->ambil($spt->irban, $tanggal, $spt->klasifikasi, $spt->kodeArsip);
             $spt->forceFill([
                 'nomor_urut' => $n['nomor_urut'], 'nomor_lengkap' => $n['nomor_lengkap'], 'nomor_counter_id' => $n['counter']->id,
                 'tahun' => $tanggal->year, 'tanggal_spt' => $tanggal->toDateString(),

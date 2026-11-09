@@ -13,6 +13,7 @@ use App\Livewire\BagianUmum\Register;
 use App\Livewire\Spt\Detail;
 use App\Models\Irban;
 use App\Models\Klasifikasi;
+use App\Models\KodeArsip;
 use App\Models\Spt;
 use App\Models\User;
 use Carbon\CarbonImmutable;
@@ -184,7 +185,8 @@ class NomorSppdTest extends TestCase
     public function test_catat_manual_drawer_sets_sppd(): void
     {
         $this->spt('diterima', ['nomor_sppd' => 'DUP-2']);
-        $data = ['irban_id' => (string) $this->irban->id, 'klasifikasi_id' => (string) Klasifikasi::where('kode', 'KHUSUS')->value('id'), 'jenis_penugasan_id' => '',
+        $data = ['irban_id' => (string) $this->irban->id, 'klasifikasi_id' => (string) Klasifikasi::where('kode', 'KHUSUS')->value('id'),
+            'kode_arsip_id' => (string) KodeArsip::where('kode', '700')->value('id'), 'jenis_penugasan_id' => '',
             'uraian_untuk' => 'Pemeriksaan mendesak', 'tanggal_mulai' => '2026-10-20', 'tanggal_selesai' => '2026-10-25', 'alasan' => 'Perintah mendadak dari Bupati'];
         $c = Livewire::actingAs($this->bu)->test(Register::class)->call('bukaManual')->assertSee('Nomor SPPD')
             ->set('manual.nomor_sppd', 'DUP-2')->assertSee('Nomor SPPD ini juga tercatat pada')

@@ -10,6 +10,7 @@ use App\Models\Irban;
 use App\Models\IrbanTahunan;
 use App\Models\JenisPenugasan;
 use App\Models\Klasifikasi;
+use App\Models\KodeArsip;
 use App\Models\Objek;
 use App\Models\Pegawai;
 use App\Models\Pkpt;
@@ -92,7 +93,7 @@ class PengajuanTest extends TestCase
     private function data(array $over = []): array
     {
         return array_merge([
-            'klasifikasi_id' => $this->klas('REGULER'), 'pkpt_item_id' => $this->item->id, 'non_pkpt' => false,
+            'klasifikasi_id' => $this->klas('REGULER'), 'kode_arsip_id' => KodeArsip::where('kode', '700')->value('id'), 'pkpt_item_id' => $this->item->id, 'non_pkpt' => false,
             'objek_ids' => [Objek::factory()->create()->id], 'periode_diperiksa' => 'Tahun Anggaran 2025',
             'uraian_untuk' => 'Melaksanakan Reviu LKjIP.', 'tanggal_mulai' => '2026-03-02', 'tanggal_selesai' => '2026-03-10',
             'ppj_pegawai_id' => $this->ppj->id, 'catatan_bagian_umum' => null, 'diinput_oleh' => $this->anggota->id,
@@ -128,6 +129,19 @@ class PengajuanTest extends TestCase
         $this->assertSame(['dibuat', 'diajukan'], $spt->riwayat()->orderBy('id')->pluck('kejadian')->all());
         $this->assertSame($this->anggota->id, $spt->riwayat()->orderBy('id')->first()->diinput_oleh);
         $this->assertSame($this->anggota->id, $spt->diinput_oleh);
+    }
+
+    /** 1.2 Task 2 (K4): the Irban picks the kode arsip when submitting; a draft may leave it empty, an unknown id counts as empty. */
+    public function test_kode_arsip_wajib_saat_mengajukan(): void
+    {
+        $this->assertRejected(fn () => $this->simpan(['kode_arsip_id' => null]), 'kode_arsip_id', 'Pilih kode arsip.');
+        $this->assertRejected(fn () => $this->simpan(['kode_arsip_id' => 999999]), 'kode_arsip_id', 'Pilih kode arsip.');
+        $this->assertSame(0, Spt::count());
+
+        $draf = $this->simpan(['kode_arsip_id' => 999999], 'draf');
+        $this->assertNull($draf->kode_arsip_id);
+        $delapan = KodeArsip::where('kode', '800')->value('id');
+        $this->assertSame($delapan, $this->simpan(['kode_arsip_id' => (string) $delapan], 'ajukan', $draf)->kode_arsip_id);
     }
 
     public function test_draf_needs_only_diinput_oleh_and_klasifikasi(): void

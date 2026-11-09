@@ -13,9 +13,10 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 // Status, number and authorship columns are set by the actions with forceFill, never mass-assigned from input.
-#[Fillable(['irban_id', 'klasifikasi_id', 'pkpt_item_id', 'jenis_penugasan_id', 'ppj_pegawai_id', 'periode_diperiksa', 'uraian_untuk',
+#[Fillable(['irban_id', 'klasifikasi_id', 'kode_arsip_id', 'pkpt_item_id', 'jenis_penugasan_id', 'ppj_pegawai_id', 'periode_diperiksa', 'uraian_untuk',
     'tanggal_mulai', 'tanggal_selesai', 'catatan_bagian_umum', 'diinput_oleh', 'penandatangan_pegawai_id', 'status_penandatangan'])]
 class Spt extends Model
 {
@@ -107,6 +108,11 @@ class Spt extends Model
     public function klasifikasi()
     {
         return $this->belongsTo(Klasifikasi::class);
+    }
+
+    public function kodeArsip(): BelongsTo
+    {
+        return $this->belongsTo(KodeArsip::class);
     }
 
     public function pkptItem()

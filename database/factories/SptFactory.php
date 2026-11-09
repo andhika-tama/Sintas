@@ -5,11 +5,12 @@ namespace Database\Factories;
 use App\Enums\StatusPengajuan;
 use App\Models\Irban;
 use App\Models\Klasifikasi;
+use App\Models\KodeArsip;
 use App\Models\Spt;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
-/** @extends Factory<Spt> Default: Draf, klasifikasi KHUSUS (no PKPT item required), no number. */
+/** @extends Factory<Spt> Default: Draf, klasifikasi KHUSUS (no PKPT item required), kode arsip 700, no number. */
 class SptFactory extends Factory
 {
     protected $model = Spt::class;
@@ -19,6 +20,7 @@ class SptFactory extends Factory
         return [
             'irban_id' => Irban::factory(),
             'klasifikasi_id' => fn () => Klasifikasi::where('kode', 'KHUSUS')->value('id'),
+            'kode_arsip_id' => fn () => KodeArsip::firstOrCreate(['kode' => '700'], ['nama' => 'Pengawasan Umum'])->id,
             'periode_diperiksa' => 'Tahun Anggaran 2025',
             'uraian_untuk' => 'Melaksanakan pemeriksaan khusus.',
             'tanggal_mulai' => '2026-03-02',

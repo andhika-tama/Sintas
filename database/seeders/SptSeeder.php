@@ -7,6 +7,7 @@ use App\Enums\StatusPengajuan;
 use App\Models\Irban;
 use App\Models\IrbanTahunan;
 use App\Models\Klasifikasi;
+use App\Models\KodeArsip;
 use App\Models\Pegawai;
 use App\Models\PkptItem;
 use App\Models\Spt;
@@ -31,19 +32,20 @@ class SptSeeder extends Seeder
 
         $tahun = now('Asia/Jakarta')->year;
         $khusus = Klasifikasi::where('kode', 'KHUSUS')->first();
+        $kode = KodeArsip::where('kode', '700')->firstOrFail();
         $penginput = Pegawai::orderBy('id')->value('id');
         $penomoran = app(Penomoran::class);
 
-        $buat = function (StatusPengajuan $status, string $uraian, int $bulan, bool $nomor = false) use ($irban, $user, $khusus, $tahun, $penginput, $penomoran) {
+        $buat = function (StatusPengajuan $status, string $uraian, int $bulan, bool $nomor = false) use ($irban, $user, $khusus, $kode, $tahun, $penginput, $penomoran) {
             $mulai = CarbonImmutable::create($tahun, $bulan, 5);
-            DB::transaction(function () use ($status, $uraian, $mulai, $nomor, $irban, $user, $khusus, $penginput, $penomoran) {
+            DB::transaction(function () use ($status, $uraian, $mulai, $nomor, $irban, $user, $khusus, $kode, $penginput, $penomoran) {
                 $spt = (new Spt)->forceFill([
-                    'irban_id' => $irban->id, 'klasifikasi_id' => $khusus->id, 'uraian_untuk' => $uraian, 'periode_diperiksa' => 'Tahun Anggaran '.($mulai->year - 1),
+                    'irban_id' => $irban->id, 'klasifikasi_id' => $khusus->id, 'kode_arsip_id' => $kode->id, 'uraian_untuk' => $uraian, 'periode_diperiksa' => 'Tahun Anggaran '.($mulai->year - 1),
                     'tanggal_mulai' => $mulai, 'tanggal_selesai' => $mulai->addDays(9), 'status_pengajuan' => $status, 'dibuat_oleh' => $user->id,
                     'diinput_oleh' => $penginput, 'diajukan_pada' => $status === StatusPengajuan::Draf ? null : now(),
                 ]);
                 if ($nomor) {
-                    $n = $penomoran->ambil($irban, $mulai, $khusus);
+                    $n = $penomoran->ambil($irban, $mulai, $khusus, $kode);
                     $spt->forceFill(['nomor_urut' => $n['nomor_urut'], 'nomor_lengkap' => $n['nomor_lengkap'], 'nomor_counter_id' => $n['counter']->id,
                         'tahun' => $mulai->year, 'tanggal_spt' => $mulai]);
                 }
@@ -60,11 +62,11 @@ class SptSeeder extends Seeder
         $buat(StatusPengajuan::Diterima, 'Pemeriksaan khusus kedua yang sudah bernomor.', 4, true);
         $buat(StatusPengajuan::Dibatalkan, 'Pemeriksaan khusus yang nomornya dibatalkan.', 5, true);
 
-        $this->pelaksanaan($irban, $user, $khusus, $penginput, $penomoran);
+        $this->pelaksanaan($irban, $user, $khusus, $kode, $penginput, $penomoran);
     }
 
     /** SPT diterima in every execution state. Dates are relative to today so each status stays true over time. */
-    private function pelaksanaan(Irban $irban, User $user, Klasifikasi $khusus, ?int $penginput, Penomoran $penomoran): void
+    private function pelaksanaan(Irban $irban, User $user, Klasifikasi $khusus, KodeArsip $kode, ?int $penginput, Penomoran $penomoran): void
     {
         $hari = CarbonImmutable::now('Asia/Jakarta')->startOfDay();
         // An item whose window does not include today, so an SPT linked to it is Tidak Sesuai PKPT (PRD §9.3).
@@ -103,10 +105,10 @@ class SptSeeder extends Seeder
             }
             $mulai = $hari->addDays($m);
             $dibuat = $mulai->subDays(12)->setTime(9, 15);
-            DB::transaction(function () use ($uraian, $mulai, $hari, $s, $final, $denganItem, $selesaiHari, $kendala, $item, $irban, $user, $khusus, $penginput, $penomoran, $riwayat, $pdf, $dibuat, $tim, $ppj) {
-                $n = $penomoran->ambil($irban, $mulai, $khusus);
+            DB::transaction(function () use ($uraian, $mulai, $hari, $s, $final, $denganItem, $selesaiHari, $kendala, $item, $irban, $user, $khusus, $kode, $penginput, $penomoran, $riwayat, $pdf, $dibuat, $tim, $ppj) {
+                $n = $penomoran->ambil($irban, $mulai, $khusus, $kode);
                 $spt = (new Spt)->forceFill([
-                    'irban_id' => $irban->id, 'klasifikasi_id' => $khusus->id, 'pkpt_item_id' => $denganItem ? $item->id : null,
+                    'irban_id' => $irban->id, 'klasifikasi_id' => $khusus->id, 'kode_arsip_id' => $kode->id, 'pkpt_item_id' => $denganItem ? $item->id : null,
                     'jenis_penugasan_id' => $denganItem ? $item->jenis_penugasan_id : null, 'ppj_pegawai_id' => $ppj, 'uraian_untuk' => $uraian,
                     'periode_diperiksa' => 'Tahun Anggaran '.($mulai->year - 1), 'tanggal_mulai' => $mulai, 'tanggal_selesai' => $hari->addDays($s),
                     'status_pengajuan' => StatusPengajuan::Diterima, 'dibuat_oleh' => $user->id, 'diinput_oleh' => $penginput, 'diajukan_pada' => $dibuat->addHour(),

@@ -13,6 +13,7 @@ use App\Livewire\BagianUmum\Register;
 use App\Models\Irban;
 use App\Models\JenisPenugasan;
 use App\Models\Klasifikasi;
+use App\Models\KodeArsip;
 use App\Models\NomorCounter;
 use App\Models\Objek;
 use App\Models\Pegawai;
@@ -62,7 +63,8 @@ class RegisterTest extends TestCase
     private function manual(array $o = []): array
     {
         return $o + [
-            'irban_id' => $this->irban->id, 'klasifikasi_id' => Klasifikasi::where('kode', 'KHUSUS')->value('id'), 'uraian_untuk' => 'Pemeriksaan mendesak',
+            'irban_id' => $this->irban->id, 'klasifikasi_id' => Klasifikasi::where('kode', 'KHUSUS')->value('id'),
+            'kode_arsip_id' => KodeArsip::where('kode', '700')->value('id'), 'uraian_untuk' => 'Pemeriksaan mendesak',
             'tanggal_mulai' => '2026-10-20', 'tanggal_selesai' => '2026-10-25', 'alasan' => 'Perintah mendadak dari Bupati',
         ];
     }
@@ -117,6 +119,8 @@ class RegisterTest extends TestCase
         $this->gagal(fn () => $aksi->handle($this->bu, $this->manual(['alasan' => 'pendek'])), 'alasan', 'Alasan minimal 10 karakter.');
         $this->gagal(fn () => $aksi->handle($this->bu, $this->manual(['uraian_untuk' => ''])), 'uraian_untuk', 'Perihal wajib diisi.');
         $this->gagal(fn () => $aksi->handle($this->bu, $this->manual(['tanggal_selesai' => '2026-10-01'])), 'tanggal_selesai', 'Tanggal selesai tidak boleh sebelum tanggal mulai.');
+        $this->gagal(fn () => $aksi->handle($this->bu, $this->manual(['kode_arsip_id' => ''])), 'kode_arsip_id', 'Pilih kode arsip.');
+        $this->gagal(fn () => $aksi->handle($this->bu, $this->manual(['kode_arsip_id' => 999999])), 'kode_arsip_id', 'Pilih kode arsip.');
         $this->assertSame(0, Spt::count());
         $this->assertSame(0, NomorCounter::count());
 
@@ -165,7 +169,9 @@ class RegisterTest extends TestCase
         $this->assertSame(StatusPengajuan::Dibatalkan, $spt->fresh()->status_pengajuan);
 
         $c = $this->register()->call('bukaManual')->assertSet('showManual', true)->assertSee('Gunakan hanya untuk SPT mendesak.')
-            ->set('manual.irban_id', (string) $this->irban->id)->assertSet('pratinjau', '700/2/INSPEKTORAT-II/SPT/2026');
+            ->set('manual.irban_id', (string) $this->irban->id)->assertSet('pratinjau', '')
+            ->set('manual.klasifikasi_id', (string) Klasifikasi::where('kode', 'KHUSUS')->value('id'))
+            ->set('manual.kode_arsip_id', (string) KodeArsip::where('kode', '800')->value('id'))->assertSet('pratinjau', '800/2/INSPEKTORAT-II/SPT/2026');
         $c->set('manual', $this->manual(['irban_id' => (string) $this->irban->id]))->call('catatManual')->assertHasNoErrors()->assertSet('showManual', false)
             ->assertDispatched('toast', type: 'success', message: 'Nomor 700/2/INSPEKTORAT-II/SPT/2026 dicatat');
         $this->assertSame(1, Spt::where('sumber', 'manual')->count());

@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Irban;
 use App\Models\Klasifikasi;
+use App\Models\KodeArsip;
 use App\Models\NomorCounter;
 use App\Models\Spt;
 use Carbon\CarbonImmutable;
@@ -33,7 +34,7 @@ class Penomoran
      *
      * @return array{counter: NomorCounter, nomor_urut: int, nomor_lengkap: string}
      */
-    public function ambil(Irban $irban, CarbonImmutable $tanggal, ?Klasifikasi $klasifikasi = null): array
+    public function ambil(Irban $irban, CarbonImmutable $tanggal, Klasifikasi $klasifikasi, KodeArsip $kodeArsip): array
     {
         if (DB::transactionLevel() === 0) {
             throw new LogicException('Penomoran::ambil harus dipanggil di dalam DB::transaction.');
@@ -42,7 +43,7 @@ class Penomoran
 
         self::pastikanCounter($kunci);
         $counter = NomorCounter::where($kunci)->lockForUpdate()->firstOrFail();
-        $bebas = $this->nomorBebas($counter->nomor_terakhir + 1, $irban, $tanggal, $klasifikasi);
+        $bebas = $this->nomorBebas($counter->nomor_terakhir + 1, $irban, $tanggal, $klasifikasi, $kodeArsip);
         $counter->increment('nomor_terakhir', $bebas['nomor_urut'] - $counter->nomor_terakhir);
 
         return ['counter' => $counter] + $bebas;
@@ -92,11 +93,11 @@ class Penomoran
     }
 
     /** @return array{nomor_urut: int, nomor_lengkap: string} what the next ambil() would give; no lock, no write. */
-    public function pratinjau(Irban $irban, CarbonImmutable $tanggal, ?Klasifikasi $klasifikasi = null): array
+    public function pratinjau(Irban $irban, CarbonImmutable $tanggal, Klasifikasi $klasifikasi, KodeArsip $kodeArsip): array
     {
         $nomor = (int) NomorCounter::where($this->kunci($irban, $this->tahun($tanggal)))->value('nomor_terakhir') + 1;
 
-        return $this->nomorBebas($nomor, $irban, $tanggal, $klasifikasi);
+        return $this->nomorBebas($nomor, $irban, $tanggal, $klasifikasi, $kodeArsip);
     }
 
     /**
@@ -105,10 +106,10 @@ class Penomoran
      *
      * @return array{nomor_urut: int, nomor_lengkap: string}
      */
-    private function nomorBebas(int $nomor, Irban $irban, CarbonImmutable $tanggal, ?Klasifikasi $klasifikasi): array
+    private function nomorBebas(int $nomor, Irban $irban, CarbonImmutable $tanggal, Klasifikasi $klasifikasi, KodeArsip $kodeArsip): array
     {
         for ($batas = $nomor + 1000; $nomor < $batas; $nomor++) {
-            $lengkap = $this->format($nomor, $irban, $tanggal, $klasifikasi);
+            $lengkap = $this->format($nomor, $irban, $tanggal, $klasifikasi, $kodeArsip);
             if (! Spt::where('nomor_lengkap', $lengkap)->exists()) {
                 return ['nomor_urut' => $nomor, 'nomor_lengkap' => $lengkap];
             }
@@ -117,7 +118,8 @@ class Penomoran
         throw new LogicException('Tidak ada nomor SPT bebas dalam 1.000 nomor berikutnya; periksa format penomoran.');
     }
 
-    public function format(int $nomorUrut, Irban $irban, CarbonImmutable $tanggal, ?Klasifikasi $klasifikasi = null): string
+    /** One register for every kode arsip (1.2 Task 2): the kode of the SPT only fills `{kode_arsip}`. */
+    public function format(int $nomorUrut, Irban $irban, CarbonImmutable $tanggal, ?Klasifikasi $klasifikasi, KodeArsip $kodeArsip): string
     {
         $template = $this->settings->get('penomoran.format');
         if ($klasifikasi && $this->settings->get('penomoran.klasifikasi_di_nomor')) {
@@ -128,7 +130,7 @@ class Penomoran
         }
 
         return strtr($template, [
-            '{kode_arsip}' => $this->settings->get('penomoran.kode_arsip'),
+            '{kode_arsip}' => $kodeArsip->kode,
             '{nomor_urut}' => (string) $nomorUrut,
             '{kode_irban}' => $irban->kode_nomor,
             '{tahun}' => (string) $this->tahun($tanggal),

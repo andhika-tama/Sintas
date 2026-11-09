@@ -7,6 +7,7 @@ use App\Models\IrbanTahunan;
 use App\Models\IrbanWilayah;
 use App\Models\JenisPenugasan;
 use App\Models\Klasifikasi;
+use App\Models\KodeArsip;
 use App\Models\Komentar;
 use App\Models\LandingSlide;
 use App\Models\NomorCounter;
@@ -51,6 +52,7 @@ class LabelAktivitas
         'irban_wilayah' => [IrbanWilayah::class, 'Wilayah Irban'],
         'jenis_penugasan' => [JenisPenugasan::class, 'Jenis Penugasan'],
         'klasifikasi' => [Klasifikasi::class, 'Klasifikasi'],
+        'kode_arsip' => [KodeArsip::class, 'Kode Arsip'],
         'landing_slide' => [LandingSlide::class, 'Slide Beranda'],
         'nomor_counter' => [NomorCounter::class, 'Nomor SPT'],
         'pengaturan' => [null, 'Pengaturan Sistem'],

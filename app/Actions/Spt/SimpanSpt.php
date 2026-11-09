@@ -38,6 +38,7 @@ use Illuminate\Validation\ValidationException;
  *
  * handle(User $user, ?Spt $spt, array $data, 'draf'|'ajukan', ?UploadedFile $lampiran = null, bool $hapusLampiran = false): Spt
  *  $data: klasifikasi_id, kode_arsip_id, pkpt_item_id, non_pkpt (bool, informational: no item is the same thing), jenis_penugasan_id, objek_ids (int[]),
+ *         jenis_penugasan_lainnya, objek_lainnya (free text, non-PKPT only, see bolehLainnya; a master jenis id wins over the jenis text),
  *         periode_diperiksa, uraian_untuk, tanggal_mulai, tanggal_selesai (Y-m-d), ppj_pegawai_id, catatan_bagian_umum,
  *         diinput_oleh (pegawai id), personel: ordered list of [pegawai_id, peran, sumber 'tim'|'tambahan', tim_id|null, ikut bool]
  *         (ikut=false rows are dropped before validation and storage).
@@ -193,6 +194,12 @@ class SimpanSpt
         }
     }
 
+    /** 1.2 K3: free-text "Lainnya" jenis/objek only on a non-PKPT SPT: no item, under a klasifikasi that does not require one. Used by the form too. */
+    public static function bolehLainnya(?Klasifikasi $klasifikasi, bool $adaItem): bool
+    {
+        return $klasifikasi !== null && ! $adaItem && ! $klasifikasi->wajib_item_pkpt;
+    }
+
     private function pastikanBisaDiubah(Spt $spt): void
     {
         if (! in_array($spt->status_pengajuan, [StatusPengajuan::Draf, StatusPengajuan::PerluRevisi], true)) {
@@ -203,6 +210,14 @@ class SimpanSpt
     private function int(mixed $v): ?int
     {
         return filter_var($v, FILTER_VALIDATE_INT) ?: null;
+    }
+
+    /** Trimmed text, '' as null. */
+    private function teks(mixed $v): ?string
+    {
+        $v = is_string($v) ? trim($v) : '';
+
+        return $v === '' ? null : $v;
     }
 
     private function tanggal(mixed $v): ?CarbonImmutable
@@ -273,18 +288,26 @@ class SimpanSpt
             $e['pkpt_item_id'] = 'PKPT belum disahkan.';
         }
 
+        $lainnya = self::bolehLainnya($klasifikasi, $item !== null);
         $jenisId = $item?->jenis_penugasan_id ?? $this->int($d['jenis_penugasan_id'] ?? null);
         if ($jenisId && ! JenisPenugasan::whereKey($jenisId)->exists()) {
             $jenisId = null;
         }
-        if ($ajukan && ! $jenisId) {
-            $e['jenis_penugasan_id'] = 'Pilih jenis penugasan.';
+        // R3: a master jenis wins and the Lainnya text is dropped; outside non-PKPT both texts are always null.
+        $jenisLainnya = $lainnya && ! $jenisId ? $this->teks($d['jenis_penugasan_lainnya'] ?? null) : null;
+        if ($ajukan && ! $jenisId && $jenisLainnya === null) {
+            $e['jenis_penugasan_id'] = $lainnya ? 'Pilih jenis penugasan atau isi Lainnya.' : 'Pilih jenis penugasan.';
+        } elseif ($jenisLainnya !== null && mb_strlen($jenisLainnya) > 150) {
+            $e['jenis_penugasan_lainnya'] = 'Jenis penugasan lainnya maksimal 150 karakter.';
         }
 
         $objekIds = array_values(array_unique(array_filter(array_map(fn ($v) => $this->int($v), (array) ($d['objek_ids'] ?? [])))));
         $objekIds = Objek::whereIn('id', $objekIds)->pluck('id')->all();
-        if ($ajukan && ! $objekIds) {
-            $e['objek_ids'] = 'Pilih minimal satu objek.';
+        $objekLainnya = $lainnya ? $this->teks($d['objek_lainnya'] ?? null) : null;
+        if ($ajukan && ! $objekIds && $objekLainnya === null) {
+            $e['objek_ids'] = $lainnya ? 'Pilih minimal satu objek atau isi objek lainnya.' : 'Pilih minimal satu objek.';
+        } elseif ($objekLainnya !== null && mb_strlen($objekLainnya) > 255) {
+            $e['objek_lainnya'] = 'Objek lainnya maksimal 255 karakter.';
         }
 
         $periode = trim((string) ($d['periode_diperiksa'] ?? ''));
@@ -336,7 +359,8 @@ class SimpanSpt
         }
 
         return [[
-            'klasifikasi_id' => $klasifikasi->id, 'kode_arsip_id' => $kodeArsip, 'pkpt_item_id' => $item?->id, 'jenis_penugasan_id' => $jenisId, 'ppj_pegawai_id' => $ppj,
+            'klasifikasi_id' => $klasifikasi->id, 'kode_arsip_id' => $kodeArsip, 'pkpt_item_id' => $item?->id, 'jenis_penugasan_id' => $jenisId,
+            'jenis_penugasan_lainnya' => $jenisLainnya, 'objek_lainnya' => $objekLainnya, 'ppj_pegawai_id' => $ppj,
             'periode_diperiksa' => $periode ?: null, 'uraian_untuk' => $uraian ?: null, 'tanggal_mulai' => $mulai, 'tanggal_selesai' => $selesai,
             'catatan_bagian_umum' => $catatan ?: null, 'diinput_oleh' => $diinput,
         ], $objekIds, $personel];

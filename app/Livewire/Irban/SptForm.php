@@ -38,11 +38,14 @@ class SptForm extends Component
 {
     use WithFileUploads;
 
-    private const FIELDS = ['klasifikasi_id', 'kode_arsip_id', 'pkpt_item_id', 'non_pkpt', 'jenis_penugasan_id', 'objek_ids', 'periode_diperiksa', 'uraian_untuk',
-        'tanggal_mulai', 'tanggal_selesai', 'ppj_pegawai_id', 'catatan_bagian_umum', 'diinput_oleh', 'personel'];
+    private const FIELDS = ['klasifikasi_id', 'kode_arsip_id', 'pkpt_item_id', 'non_pkpt', 'jenis_penugasan_id', 'jenis_penugasan_lainnya', 'objek_ids', 'objek_lainnya',
+        'periode_diperiksa', 'uraian_untuk', 'tanggal_mulai', 'tanggal_selesai', 'ppj_pegawai_id', 'catatan_bagian_umum', 'diinput_oleh', 'personel'];
 
     /** Props whose change can change the uraian suggestion. */
-    private const SARAN = ['pkpt_item_id', 'non_pkpt', 'jenis_penugasan_id', 'objek_ids', 'periode_diperiksa'];
+    private const SARAN = ['klasifikasi_id', 'pkpt_item_id', 'non_pkpt', 'jenis_penugasan_id', 'jenis_penugasan_lainnya', 'objek_ids', 'objek_lainnya', 'periode_diperiksa'];
+
+    /** Value of the "Lainnya" option in the jenis select: no master id, so SimpanSpt reads it as "no jenis" and uses jenis_penugasan_lainnya. */
+    public const JENIS_LAINNYA = 0;
 
     #[Locked]
     public ?int $sptId = null;
@@ -57,8 +60,12 @@ class SptForm extends Component
 
     public ?int $jenis_penugasan_id = null;
 
+    public string $jenis_penugasan_lainnya = '';
+
     /** @var list<int> */
     public array $objek_ids = [];
+
+    public string $objek_lainnya = '';
 
     public string $periode_diperiksa = '';
 
@@ -124,7 +131,11 @@ class SptForm extends Component
             'uraian_untuk' => (string) $spt->uraian_untuk, 'tanggal_mulai' => (string) $spt->tanggal_mulai?->toDateString(),
             'tanggal_selesai' => (string) $spt->tanggal_selesai?->toDateString(), 'ppj_pegawai_id' => $spt->ppj_pegawai_id,
             'catatan_bagian_umum' => (string) $spt->catatan_bagian_umum,
+            'jenis_penugasan_lainnya' => (string) $spt->jenis_penugasan_lainnya, 'objek_lainnya' => (string) $spt->objek_lainnya,
         ]);
+        if (! $spt->jenis_penugasan_id && $spt->jenis_penugasan_lainnya !== null) {
+            $this->jenis_penugasan_id = self::JENIS_LAINNYA;
+        }
         // Non-PKPT has no column: it is "no item" under a klasifikasi that does not require one (drafts included).
         $this->non_pkpt = ! $spt->pkpt_item_id && ! Klasifikasi::find($spt->klasifikasi_id)?->wajib_item_pkpt;
         $this->personel = $spt->personel->map(fn ($p) => ['pegawai_id' => $p->pegawai_id, 'peran' => $p->peran->value, 'sumber' => $p->sumber,
@@ -145,6 +156,7 @@ class SptForm extends Component
         }
         if ($prop === 'pkpt_item_id' && $this->pkpt_item_id) {
             $this->jenis_penugasan_id = $this->item()?->jenis_penugasan_id;
+            $this->jenis_penugasan_lainnya = $this->objek_lainnya = ''; // SimpanSpt drops them anyway once an item is linked
         }
         if (in_array(explode('.', $prop)[0], self::SARAN, true) && ($this->uraian_untuk === '' || $this->uraian_untuk === $this->saranTerpakai)) {
             $this->gunakanSaran();
@@ -330,15 +342,27 @@ class SptForm extends Component
         return $this->pkpt_item_id ? PkptItem::aktif()->with(['jenisPenugasan', 'pkpt'])->where('irban_id', $this->irban()->irban_id)->find($this->pkpt_item_id) : null;
     }
 
+    /** Same rule as SimpanSpt: Lainnya only without an item, under a klasifikasi that does not require one. */
+    private function bolehLainnya(): bool
+    {
+        return SimpanSpt::bolehLainnya($this->klasifikasi(), (bool) $this->item());
+    }
+
     private function saran(): ?string
     {
-        $jenis = $this->item()?->jenisPenugasan ?? ($this->jenis_penugasan_id ? JenisPenugasan::find($this->jenis_penugasan_id) : null);
-        if (! $jenis) {
+        $lainnya = $this->bolehLainnya();
+        $jenis = $this->item()?->jenisPenugasan?->nama ?? ($this->jenis_penugasan_id ? JenisPenugasan::find($this->jenis_penugasan_id)?->nama : null)
+            ?? ($lainnya && trim($this->jenis_penugasan_lainnya) !== '' ? trim($this->jenis_penugasan_lainnya) : null);
+        if ($jenis === null) {
             return null;
         }
         $objek = Objek::whereIn('id', $this->objek_ids)->pluck('nama', 'id');
+        $nama = collect($this->objek_ids)->map(fn ($id) => $objek[$id] ?? '')->all();
+        if ($lainnya) {
+            $nama[] = trim($this->objek_lainnya);
+        }
 
-        return app(SaranUraian::class)->saran($jenis->nama, collect($this->objek_ids)->map(fn ($id) => $objek[$id] ?? '')->all(), $this->periode_diperiksa);
+        return app(SaranUraian::class)->saran($jenis, $nama, $this->periode_diperiksa);
     }
 
     public function render(SimpanSpt $action, ValidatePersonel $validatePersonel, KesesuaianPkpt $kesesuaian)
@@ -368,7 +392,9 @@ class SptForm extends Component
             'itemOptions' => $items->mapWithKeys(fn ($i) => [$i->id => $i->jenisPenugasan->nama.' · '.$rentang[$i->id]])->all(),
             'item' => $item,
             'itemRentang' => $item ? $rentang[$item->id] : null,
-            'jenisOptions' => JenisPenugasan::orderBy('nama')->pluck('nama', 'id')->all(),
+            'bolehLainnya' => $bolehLainnya = $this->bolehLainnya(),
+            'jenisOptions' => JenisPenugasan::orderBy('nama')->pluck('nama', 'id')->all() + ($bolehLainnya ? [self::JENIS_LAINNYA => Spt::LABEL_LAINNYA] : []),
+            'jenisLainnya' => $bolehLainnya && $this->jenis_penugasan_id === self::JENIS_LAINNYA,
             'jenis' => $this->jenis_penugasan_id ? JenisPenugasan::find($this->jenis_penugasan_id) : null,
             'objekOptions' => $objek->mapWithKeys(fn ($o) => [$o->id => $o->parent ? $o->parent->nama.' › '.$o->nama : $o->nama])->all(),
             'pegawaiOptions' => $aktif->mapWithKeys(fn ($p) => [$p->id => $p->nama_bergelar.' · '.$p->nip.($p->jabatan ? ' · '.$p->jabatan : '')])->all(),

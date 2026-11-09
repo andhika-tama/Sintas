@@ -186,7 +186,9 @@ class PengajuanTest extends TestCase
         $this->assertRejected(fn () => $this->simpan(['ppj_pegawai_id' => Pegawai::factory()->create(['aktif' => false])->id]), 'ppj_pegawai_id', 'Pilih PPJ.');
         // Jenis is required manually when no item is chosen.
         $this->assertRejected(fn () => $this->simpan(['klasifikasi_id' => $this->klas('KHUSUS'), 'pkpt_item_id' => null, 'jenis_penugasan_id' => null]),
-            'jenis_penugasan_id', 'Pilih jenis penugasan.');
+            'jenis_penugasan_id', 'Pilih jenis penugasan atau isi Lainnya.');
+        $this->assertRejected(fn () => $this->simpan(['klasifikasi_id' => $this->klas('KHUSUS'), 'pkpt_item_id' => null, 'objek_ids' => []]),
+            'objek_ids', 'Pilih minimal satu objek atau isi objek lainnya.');
     }
 
     public function test_non_pkpt_only_for_klasifikasi_without_wajib_item(): void

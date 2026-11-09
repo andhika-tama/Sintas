@@ -16,14 +16,34 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 // Status, number and authorship columns are set by the actions with forceFill, never mass-assigned from input.
-#[Fillable(['irban_id', 'klasifikasi_id', 'kode_arsip_id', 'pkpt_item_id', 'jenis_penugasan_id', 'ppj_pegawai_id', 'periode_diperiksa', 'uraian_untuk',
-    'tanggal_mulai', 'tanggal_selesai', 'catatan_bagian_umum', 'diinput_oleh', 'penandatangan_pegawai_id', 'status_penandatangan'])]
+#[Fillable(['irban_id', 'klasifikasi_id', 'kode_arsip_id', 'pkpt_item_id', 'jenis_penugasan_id', 'jenis_penugasan_lainnya', 'objek_lainnya', 'ppj_pegawai_id',
+    'periode_diperiksa', 'uraian_untuk', 'tanggal_mulai', 'tanggal_selesai', 'catatan_bagian_umum', 'diinput_oleh', 'penandatangan_pegawai_id', 'status_penandatangan'])]
 class Spt extends Model
 {
     /** @use HasFactory<SptFactory> */
     use DicatatAktivitas, HasFactory, MenyegarkanCachePublik;
 
+    /** Group label for free-text jenis/objek of a non-PKPT SPT (1.2 K3). */
+    public const LABEL_LAINNYA = 'Lainnya';
+
     protected $table = 'spt';
+
+    /** Master jenis name, else the non-PKPT free text; null while neither is set (drafts). */
+    public function namaJenis(): ?string
+    {
+        return $this->jenisPenugasan?->nama ?? $this->jenis_penugasan_lainnya;
+    }
+
+    /** @return list<string> master objek names sorted by name, then objek_lainnya when set. */
+    public function namaObjek(): array
+    {
+        $nama = $this->objek->pluck('nama')->sort(SORT_NATURAL | SORT_FLAG_CASE)->values()->all();
+        if ($this->objek_lainnya !== null && $this->objek_lainnya !== '') {
+            $nama[] = $this->objek_lainnya;
+        }
+
+        return $nama;
+    }
 
     protected function casts(): array
     {

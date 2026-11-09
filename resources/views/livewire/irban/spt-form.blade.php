@@ -4,7 +4,8 @@
 @php
     $fields = [
         'diinput_oleh' => 'Diinput oleh', 'klasifikasi_id' => 'Klasifikasi', 'kode_arsip_id' => 'Kode arsip', 'pkpt_item_id' => 'Item PKPT', 'jenis_penugasan_id' => 'Jenis penugasan',
-        'objek_ids' => 'Wilayah/Objek', 'tanggal_mulai' => 'Tanggal mulai', 'tanggal_selesai' => 'Tanggal selesai', 'periode_diperiksa' => 'Periode diperiksa',
+        'jenis_penugasan_lainnya' => 'Jenis penugasan lainnya', 'objek_ids' => 'Wilayah/Objek', 'objek_lainnya' => 'Objek lainnya',
+        'tanggal_mulai' => 'Tanggal mulai', 'tanggal_selesai' => 'Tanggal selesai', 'periode_diperiksa' => 'Periode diperiksa',
         'uraian_untuk' => 'Untuk', 'ppj_pegawai_id' => 'PPJ', 'personel' => 'Susunan Personel', 'lampiran' => 'Lampiran draf', 'catatan_bagian_umum' => 'Catatan untuk Bagian Umum',
     ];
     $peranLabel = ['supervisor_dalnis' => 'Supervisor/Dalnis', 'ketua' => 'Ketua Tim', 'anggota' => 'Anggota'];
@@ -131,13 +132,24 @@
                     </p>
                 </div>
             @else
+                {{-- 1.2 K3: non-PKPT gets the last option "Lainnya" (SptForm::JENIS_LAINNYA) and types the jenis; shown without animation (DESIGN §7.5). --}}
                 <x-ui.select label="Jenis penugasan" name="jenis_penugasan_id" :options="$jenisOptions" placeholder="Pilih jenis penugasan" required
+                    :helper="$bolehLainnya ? 'Pilih “Lainnya” bila jenis penugasan tidak ada di daftar.' : null"
                     wire:model.live="jenis_penugasan_id" :value="$jenis_penugasan_id" :error="$errors->first('jenis_penugasan_id')" />
+                @if ($jenisLainnya)
+                    <x-ui.input label="Jenis penugasan lainnya" name="jenis_penugasan_lainnya" wire:model.live.blur="jenis_penugasan_lainnya" required maxlength="150"
+                        helper="Contoh: Pendampingan pemeriksaan BPK" :error="$errors->first('jenis_penugasan_lainnya')" />
+                @endif
             @endif
 
-            <x-ui.combobox name="objek_ids" label="Wilayah/Objek" multiple :options="$objekOptions" wire:model.live="objek_ids" required
-                placeholder="Cari kecamatan, desa atau OPD" helper="Bisa lebih dari satu. Desa dan unit di bawah kecamatan tampil sebagai “Kecamatan › Desa”."
+            <x-ui.combobox name="objek_ids" label="Wilayah/Objek" multiple :options="$objekOptions" wire:model.live="objek_ids" :required="! $bolehLainnya"
+                placeholder="Cari kecamatan, desa atau OPD"
+                :helper="'Bisa lebih dari satu. Desa dan unit di bawah kecamatan tampil sebagai “Kecamatan › Desa”.'.($bolehLainnya ? ' Isi Objek lainnya bila objek tidak ada di daftar.' : '')"
                 :error="$errors->first('objek_ids')" />
+            @if ($bolehLainnya)
+                <x-ui.input label="Objek lainnya" name="objek_lainnya" wire:model.live.blur="objek_lainnya" maxlength="255"
+                    helper="Wajib bila tidak ada objek dari daftar; boleh diisi bersama objek dari daftar." :error="$errors->first('objek_lainnya')" />
+            @endif
         </section>
 
         {{-- 2. Waktu + periode --}}

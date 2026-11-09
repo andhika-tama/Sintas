@@ -331,6 +331,34 @@ class SptFormTest extends TestCase
         $this->form($reguler)->assertSet('non_pkpt', false);
     }
 
+    /** 1.2 Task 4 (K3): "Lainnya" for jenis (last select option + text) and objek (text under the combobox), non-PKPT only. */
+    public function test_jenis_lainnya_membuka_input_teks_dan_dipakai_saran(): void
+    {
+        $this->form()->set('klasifikasi_id', $this->klas('REGULER'))->assertDontSeeHtml('>Lainnya</option>')->assertDontSeeHtml('id="objek_lainnya"');
+
+        $page = $this->form()->set('klasifikasi_id', $this->klas('KHUSUS'))->set('non_pkpt', true)
+            ->assertSeeHtml('>Lainnya</option>')->assertSeeHtml('id="objek_lainnya"')->assertDontSeeHtml('id="jenis_penugasan_lainnya"')
+            ->set('jenis_penugasan_id', SptForm::JENIS_LAINNYA)->assertSeeHtml('id="jenis_penugasan_lainnya"')
+            ->set('jenis_penugasan_lainnya', 'Pendampingan BPK')->set('objek_ids', [$this->objek->id])->set('objek_lainnya', 'Aula Kantor Bupati')
+            ->set('periode_diperiksa', 'Tahun Anggaran 2025')
+            ->assertSet('uraian_untuk', 'Melaksanakan Pendampingan BPK pada Dinas PUPR dan Aula Kantor Bupati untuk Tahun Anggaran 2025.');
+
+        $page->set('diinput_oleh', $this->budi->id)->call('simpan')->assertHasNoErrors();
+        $spt = Spt::sole();
+        $this->assertSame(['Pendampingan BPK', 'Aula Kantor Bupati'], [$spt->jenis_penugasan_lainnya, $spt->objek_lainnya]);
+        $this->form($spt)->assertSet('jenis_penugasan_id', SptForm::JENIS_LAINNYA)->assertSet('jenis_penugasan_lainnya', 'Pendampingan BPK')
+            ->assertSet('objek_lainnya', 'Aula Kantor Bupati')->assertSeeHtml('id="jenis_penugasan_lainnya"');
+    }
+
+    public function test_memilih_item_pkpt_mengosongkan_teks_lainnya(): void
+    {
+        $this->form()->set('klasifikasi_id', $this->klas('KHUSUS'))->set('jenis_penugasan_id', SptForm::JENIS_LAINNYA)
+            ->set('jenis_penugasan_lainnya', 'Pendampingan BPK')->set('objek_lainnya', 'Aula Kantor Bupati')
+            ->set('pkpt_item_id', $this->item->id)
+            ->assertSet('jenis_penugasan_lainnya', '')->assertSet('objek_lainnya', '')->assertSet('jenis_penugasan_id', $this->item->jenis_penugasan_id)
+            ->assertDontSeeHtml('id="objek_lainnya"')->assertDontSeeHtml('id="jenis_penugasan_lainnya"');
+    }
+
     public function test_edit_only_own_irban_and_editable_statuses(): void
     {
         $lain = Spt::factory()->create();

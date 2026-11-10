@@ -26,6 +26,7 @@ use App\Services\Ekspor\PembangunRekap;
 use App\Services\PenandaSpt;
 use App\Services\Publik\RealisasiPublik;
 use App\Services\RekapTriwulan;
+use App\Support\DiinputOleh;
 use Carbon\CarbonImmutable;
 use Database\Seeders\DatabaseSeeder;
 use Database\Seeders\KinerjaSeeder;
@@ -218,6 +219,18 @@ class DataDemoTest extends TestCase
             $this->assertTrue($hasil['ketua'] && $hasil['supervisor'] && $hasil['duplikat']);
             $this->assertEmpty(array_diff(array_column($baris, 'pegawai_id'), $anggota));
         }
+    }
+
+    /** 1.2: the Sekretariat account can fill "Diinput oleh" (komposisi for this year), but has no PKPT item or SPT of its own. */
+    public function test_sekretariat_punya_komposisi_tanpa_spt(): void
+    {
+        $this->seedDemo();
+
+        $irban = Irban::where('nama', 'Sekretariat')->firstOrFail();
+        $komposisi = IrbanTahunan::where(['irban_id' => $irban->id, 'tahun' => 2026])->firstOrFail();
+        $this->assertCount(2, $komposisi->anggota);
+        $this->assertCount(3, DiinputOleh::pilihan(User::where('username', 'sekretariat')->firstOrFail()));
+        $this->assertSame(0, Spt::where('irban_id', $irban->id)->count());
     }
 
     /** 1.1.4 Task 6 (K9): with the demo target_spt filled, the Irban I rekap is no longer above 100% in any quarter or the year. */

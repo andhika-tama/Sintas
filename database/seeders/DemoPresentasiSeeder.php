@@ -57,6 +57,9 @@ class DemoPresentasiSeeder extends Seeder
         'Irban Khusus' => [['Zulkifli Hasan, S.H., M.H.', 'Mega Puspita, S.E.', 'Rudi Hartono, S.T.', 'Intan Permatasari, S.Ak.'], ['Sungai Rotan', 'Muara Belida']],
     ];
 
+    /** 1.2: Sekretariat gets only a komposisi for this year (PPJ first), so its account can fill "Diinput oleh"; no PKPT item or SPT. */
+    private const SEKRETARIAT = ['Drs. Ahmad Fauzi, M.M.', 'Sri Wahyuni, S.E.', 'Taufik Hidayat, S.Kom.'];
+
     /** Months of the eight 2025 items per irban; every 2025 SPT is marked Selesai with LHP (the late case is 2026 only). */
     private const BULAN_2025 = [2, 3, 4, 5, 7, 8, 9, 10];
 
@@ -98,6 +101,7 @@ class DemoPresentasiSeeder extends Seeder
 
         try {
             $tim = $this->siapkanIrban();
+            $this->siapkanSekretariat();
             $this->tahun2025($tim);
             foreach ($tim as $t) {
                 $this->tahun2026($t);
@@ -168,6 +172,19 @@ class DemoPresentasiSeeder extends Seeder
         }
 
         return $hasil;
+    }
+
+    private function siapkanSekretariat(): void
+    {
+        $irban = Irban::where('nama', 'Sekretariat')->first();
+        if (! $irban) {
+            return;
+        }
+        $ids = array_map(fn ($n) => Pegawai::factory()->create(['nama_bergelar' => $n, 'jabatan' => 'Auditor'])->id, self::SEKRETARIAT);
+        $k = IrbanTahunan::firstOrCreate(['irban_id' => $irban->id, 'tahun' => $this->hari->year], ['ppj_pegawai_id' => $ids[0]]);
+        if ($k->wasRecentlyCreated) {
+            $k->anggota()->attach(array_slice($ids, 1));
+        }
     }
 
     /** SimpanSpt payload: PPJ = first pegawai, the second one is "Diinput oleh" and Ketua, the rest Anggota. */

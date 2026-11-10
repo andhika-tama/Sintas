@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Demo;
 
+use App\Actions\MasterData\ValidateTimComposition;
 use App\Actions\Spt\ValidatePersonel;
 use App\Enums\StatusPengajuan;
 use App\Enums\StatusPerubahan;
@@ -228,9 +229,27 @@ class DataDemoTest extends TestCase
 
         $irban = Irban::where('nama', 'Sekretariat')->firstOrFail();
         $komposisi = IrbanTahunan::where(['irban_id' => $irban->id, 'tahun' => 2026])->firstOrFail();
-        $this->assertCount(2, $komposisi->anggota);
-        $this->assertCount(3, DiinputOleh::pilihan(User::where('username', 'sekretariat')->firstOrFail()));
+        $this->assertCount(6, $komposisi->anggota);
+        $this->assertCount(7, DiinputOleh::pilihan(User::where('username', 'sekretariat')->firstOrFail()));
         $this->assertSame(0, Spt::where('irban_id', $irban->id)->count());
+    }
+
+    /** Every irban has at least two valid teams this year, drawn from its komposisi, so the demo can use any irban. */
+    public function test_setiap_irban_punya_dua_tim_dari_komposisi(): void
+    {
+        $this->seedDemo();
+
+        foreach (Irban::all() as $irban) {
+            $komposisi = IrbanTahunan::where(['irban_id' => $irban->id, 'tahun' => 2026])->firstOrFail();
+            $this->assertGreaterThanOrEqual(6, $komposisi->anggota()->count(), $irban->nama);
+            $boleh = $komposisi->anggota()->pluck('pegawai.id')->push($komposisi->ppj_pegawai_id)->all();
+            $tim = Tim::with('anggota')->where(['irban_id' => $irban->id, 'tahun' => 2026])->get();
+            $this->assertGreaterThanOrEqual(2, $tim->count(), $irban->nama);
+            foreach ($tim as $t) {
+                app(ValidateTimComposition::class)->handle($t->anggota->map(fn ($a) => ['pegawai_id' => $a->pegawai_id, 'peran_default' => $a->peran_default->value])->all());
+                $this->assertEmpty(array_diff($t->anggota->pluck('pegawai_id')->all(), $boleh), "{$irban->nama} {$t->nama}");
+            }
+        }
     }
 
     /** 1.1.4 Task 6 (K9): with the demo target_spt filled, the Irban I rekap is no longer above 100% in any quarter or the year. */

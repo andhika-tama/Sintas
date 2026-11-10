@@ -36,7 +36,7 @@ class DatabaseSeeder extends Seeder
             $this->call([
                 UserSeeder::class, TimSeeder::class, IrbanWilayahSeeder::class, PkptSeeder::class, PkptIrbanIDemo2026Seeder::class,
                 SptSeeder::class, RealisasiDemoSeeder::class, KomentarSeeder::class, NotifikasiSeeder::class, LandingSeeder::class,
-                DemoPresentasiSeeder::class,
+                DemoPresentasiSeeder::class, TimDemoSeeder::class,
             ]);
         } finally {
             Carbon::setTestNow($jam);

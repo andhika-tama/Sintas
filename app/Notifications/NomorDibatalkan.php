@@ -30,7 +30,8 @@ class NomorDibatalkan extends NotifikasiSintas
 
     public function konteks(): ?string
     {
-        return "SPT {$this->nomor}";
+        // The bell names the canceller too (spec 1.2.1 Task 4.5): recipients without email must see who cancelled.
+        return collect(["SPT {$this->nomor}", "oleh {$this->pembatal}"])->filter()->implode(' · ');
     }
 
     public function url(): string

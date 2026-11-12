@@ -246,8 +246,12 @@ class PembatalanSptTest extends TestCase
         }
         Notification::assertSentOnDemand(EmailPegawai::class, fn ($n, $channels, AnonymousNotifiable $to) => $to->routes['mail'] === 'pegawai@example.test');
 
-        $mail = Notification::sent($this->pimpinan, NomorDibatalkan::class)->first()->toMail($this->pimpinan);
-        $this->assertSame(["Nomor SPT {$spt->nomor_lengkap} dibatalkan oleh Bagian Umum."], $mail->introLines);
+        $n = Notification::sent($this->pimpinan, NomorDibatalkan::class)->first();
+        $this->assertSame(["Nomor SPT {$spt->nomor_lengkap} dibatalkan oleh Bagian Umum."], $n->toMail($this->pimpinan)->introLines);
+        // The bell (no email needed) names the number, the canceller and the reason too.
+        $bel = $n->toArray($this->pimpinan);
+        $this->assertSame(["SPT {$spt->nomor_lengkap} · oleh Bagian Umum", 'Penugasan digabung ke SPT lain.'], [$bel['konteks'], $bel['catatan']]);
+        $this->assertSame($bel, Notification::sent($this->irbanUser, NomorDibatalkan::class)->first()->toArray($this->irbanUser));
     }
 
     public function test_notifikasi_pembatalan_oleh_irban(): void
@@ -272,7 +276,7 @@ class PembatalanSptTest extends TestCase
         $this->assertStringContainsString("Nomor SPT {$spt->nomor_lengkap} dibatalkan oleh Irban II (diinput oleh Budi Penginput, S.E.).", strip_tags($html));
         $this->assertStringContainsString('Catatan: Penugasan digabung ke SPT lain.', strip_tags($html));
         $this->assertSame([
-            'jenis' => 'nomor_dibatalkan', 'judul' => 'Nomor SPT dibatalkan', 'konteks' => "SPT {$spt->nomor_lengkap}",
+            'jenis' => 'nomor_dibatalkan', 'judul' => 'Nomor SPT dibatalkan', 'konteks' => "SPT {$spt->nomor_lengkap} · oleh Irban II (diinput oleh Budi Penginput, S.E.)",
             'url' => '/spt/'.$spt->id, 'catatan' => 'Penugasan digabung ke SPT lain.',
         ], $n->toArray($this->bu));
     }

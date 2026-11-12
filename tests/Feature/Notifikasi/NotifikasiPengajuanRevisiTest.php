@@ -200,7 +200,7 @@ class NotifikasiPengajuanRevisiTest extends TestCase
 
         $this->assertHanya(NomorDibatalkan::class, $this->irbanUser, $this->pimpinan);
         $this->assertSame([
-            'jenis' => 'nomor_dibatalkan', 'judul' => 'Nomor SPT dibatalkan', 'konteks' => 'SPT 700/1/INSPEKTORAT-I/SPT/2026',
+            'jenis' => 'nomor_dibatalkan', 'judul' => 'Nomor SPT dibatalkan', 'konteks' => 'SPT 700/1/INSPEKTORAT-I/SPT/2026 · oleh Bagian Umum',
             'url' => '/spt/'.$spt->id, 'catatan' => 'Salah ketik perihal SPT',
         ], $this->dikirim($this->irbanUser, NomorDibatalkan::class)->toArray($this->irbanUser));
 

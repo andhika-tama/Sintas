@@ -190,6 +190,7 @@ class NotifikasiPengajuanRevisiTest extends TestCase
         $this->gagal(fn () => app(MintaRevisi::class)->handle($this->bu, $menunggu, 'pendek'));
     }
 
+    /** versi 1.2.1 K5: cancelled by Bagian Umum goes to the irban and every Pimpinan. */
     public function test_nomor_dibatalkan_goes_to_the_irban_with_alasan(): void
     {
         NotificationFacade::fake();
@@ -197,7 +198,7 @@ class NotifikasiPengajuanRevisiTest extends TestCase
 
         app(BatalkanNomor::class)->handle($this->bu, $spt, 'Salah ketik perihal SPT');
 
-        $this->assertHanya(NomorDibatalkan::class, $this->irbanUser);
+        $this->assertHanya(NomorDibatalkan::class, $this->irbanUser, $this->pimpinan);
         $this->assertSame([
             'jenis' => 'nomor_dibatalkan', 'judul' => 'Nomor SPT dibatalkan', 'konteks' => 'SPT 700/1/INSPEKTORAT-I/SPT/2026',
             'url' => '/spt/'.$spt->id, 'catatan' => 'Salah ketik perihal SPT',

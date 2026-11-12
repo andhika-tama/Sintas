@@ -9,6 +9,7 @@ use App\Models\Spt;
 use App\Models\User;
 use App\Notifications\EksporGagal;
 use App\Notifications\KataSandiDiubah;
+use App\Notifications\NomorDibatalkan;
 use App\Notifications\NotifikasiSintas;
 use App\Notifications\PengingatSptFinal;
 use App\Notifications\PerubahanPkptDiajukan;
@@ -16,6 +17,7 @@ use App\Notifications\RingkasanMingguan;
 use App\Notifications\SptTerlambat;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Mail\Markdown;
 use Tests\TestCase;
 
 /** Fase 11.2 Task 2: email content gaps (CTA per jenis, toMail bodies, payload scalars, tembusan trimming, escape round trip). */
@@ -104,5 +106,21 @@ class IsiNotifikasiTest extends TestCase
         $this->assertSame(strlen($semua) * 2, strlen($aman)); // each one got exactly one backslash
         $this->assertSame($semua, NotifikasiSintas::tanpaEscape($aman));
         $this->assertSame('a b', NotifikasiSintas::aman("a\r\nb"));
+    }
+
+    /** versi 1.2.1 Task 4: the email names the number, the canceller and the reason; the canceller's name is user text (escaped), and the payload survives the queue. */
+    public function test_nomor_dibatalkan_names_the_canceller(): void
+    {
+        $spt = Spt::factory()->diterima()->create(['nomor_lengkap' => '700/9/INSPEKTORAT-I/SPT/2026']);
+        $user = User::factory()->bagianUmum()->create();
+        $n = unserialize(serialize(new NomorDibatalkan($spt, 'Penugasan digabung.', 'Irban I (diinput oleh [Budi](http://x))')));
+
+        $mail = $n->toMail($user);
+        $html = (string) $mail->render();
+        $this->assertStringContainsString('Nomor SPT 700/9/INSPEKTORAT-I/SPT/2026 dibatalkan oleh Irban I (diinput oleh [Budi](http://x)).', strip_tags($html));
+        $this->assertStringNotContainsString('<a href="http://x"', $html);
+        $this->assertStringContainsString('Catatan: Penugasan digabung.', strip_tags($html));
+        $this->assertStringContainsString('dibatalkan oleh Irban I (diinput oleh [Budi](http://x)).', (string) app(Markdown::class)->renderText($mail->markdown, $mail->data()));
+        $this->assertSame('Penugasan digabung.', $n->toArray($user)['catatan']);
     }
 }

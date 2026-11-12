@@ -6,11 +6,13 @@ use App\Models\Spt;
 
 class NomorDibatalkan extends NotifikasiSintas
 {
-    private string $nomor;
+    // protected, not private: queued notifications skip a parent's private properties when serialising (Jebakan).
+    protected string $nomor;
 
-    private int $sptId;
+    protected int $sptId;
 
-    public function __construct(Spt $spt, private string $alasan)
+    /** $pembatal: "Bagian Umum", or "{irban} (diinput oleh {nama})" when the Irban cancelled (versi 1.2.1 K5). */
+    public function __construct(Spt $spt, protected string $alasan, protected string $pembatal)
     {
         $this->nomor = $spt->nomor_lengkap;
         $this->sptId = $spt->id;
@@ -43,6 +45,6 @@ class NomorDibatalkan extends NotifikasiSintas
 
     public function isi(): array
     {
-        return ["Nomor SPT {$this->nomor} dibatalkan oleh Bagian Umum."];
+        return ["Nomor SPT {$this->nomor} dibatalkan oleh ".self::aman($this->pembatal).'.'];
     }
 }

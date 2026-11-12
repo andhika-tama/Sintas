@@ -2,12 +2,15 @@
 
 namespace App\Livewire\Spt;
 
+use App\Actions\Spt\BatalkanNomor;
 use App\Actions\Spt\Concerns\IzinPelaksanaan;
 use App\Actions\Spt\SimpanKendala;
 use App\Actions\Spt\TandaiSelesai;
 use App\Actions\Spt\UbahNomorSppd;
 use App\Actions\Spt\UbahTanggalRealisasi;
 use App\Actions\Spt\UnggahDokumenSpt;
+use App\Enums\Role;
+use App\Enums\StatusPengajuan;
 use App\Models\Aktivitas;
 use App\Models\Spt;
 use App\Services\KesesuaianPkpt;
@@ -23,8 +26,9 @@ use Livewire\WithFileUploads;
 
 /**
  * Shared SPT detail page (_shared.md §7), any role allowed by SptPolicy::view, with the four Irban action modals
- * (Ubah Tanggal, Unggah SPT Final, Tandai Selesai, Kendala). The component only collects input and calls the actions;
- * the actions authorize `laksanakan` and hold every rule (the UI reads TandaiSelesai::syarat()/bisa()).
+ * (Ubah Tanggal, Unggah SPT Final, Tandai Selesai, Kendala) plus Batalkan Penugasan for the owning Irban (versi 1.2.1 Task 4).
+ * The component only collects input and calls the actions; the actions authorize (`laksanakan`, `batalkan`) and hold every rule
+ * (the UI reads TandaiSelesai::syarat()/bisa() and BatalkanNomor::cegah()).
  * The Nomor SPPD panel is editable for `ubahSppd` (Bagian Umum) through UbahNomorSppd, read-only for everyone else.
  */
 class Detail extends Component
@@ -38,6 +42,7 @@ class Detail extends Component
         'final' => ['berkas', 'diinput_oleh'],
         'selesai' => ['berkas', 'nomor_lhp', 'tanggal_lhp', 'konfirmasi', 'diinput_oleh'],
         'kendala' => ['kategori', 'uraian', 'diinput_oleh'],
+        'batal' => ['alasan', 'diinput_oleh'],
     ];
 
     #[Locked]
@@ -97,15 +102,24 @@ class Detail extends Component
         $this->dispatch('toast', type: 'success', message: $spt->nomor_sppd === null ? 'Nomor SPPD dihapus' : 'Nomor SPPD disimpan');
     }
 
-    public function buka(string $modal): void
+    public function buka(string $modal, BatalkanNomor $batal): void
     {
         $spt = $this->sptDasar();
-        try {
-            $this->izinkan(auth()->user(), $spt); // owning Irban on a Selesai SPT gets the toast, others 403
-        } catch (ValidationException $e) {
-            $this->galatUmum($e->errors()['spt'][0]);
+        if ($modal === 'batal') {
+            Gate::authorize('batalkan', $spt);
+            if ($pesan = $batal->cegah($spt)) {
+                $this->galatUmum($pesan);
 
-            return;
+                return;
+            }
+        } else {
+            try {
+                $this->izinkan(auth()->user(), $spt); // owning Irban on a Selesai SPT gets the toast, others 403
+            } catch (ValidationException $e) {
+                $this->galatUmum($e->errors()['spt'][0]);
+
+                return;
+            }
         }
         if (! isset(self::FIELDS[$modal])) {
             return;
@@ -124,7 +138,7 @@ class Detail extends Component
 
     public function gantiPenginput(): void
     {
-        Gate::authorize('laksanakan', $this->sptDasar());
+        Gate::authorize($this->modal === 'batal' ? 'batalkan' : 'laksanakan', $this->sptDasar());
         $this->ganti = true;
     }
 
@@ -158,8 +172,14 @@ class Detail extends Component
         $this->jalankan('kendala', 'Kendala disimpan', fn (Spt $spt) => $aksi->handle(auth()->user(), $spt, $this->only(self::FIELDS['kendala'])), 'aksi-kendala');
     }
 
+    public function batalkan(BatalkanNomor $aksi): void
+    {
+        // The status becomes Dibatalkan and every action button disappears, so focus goes to the h1.
+        $this->jalankan('batal', 'Penugasan dibatalkan', fn (Spt $spt) => $aksi->handle(auth()->user(), $spt, $this->alasan, $this->diinput_oleh), 'judul-spt');
+    }
+
     /**
-     * Runs an action (it authorizes `laksanakan`): errors of the open modal's fields stay inline, any other key (`spt`) closes it as a toast.
+     * Runs an action (it authorizes `laksanakan` or `batalkan`): errors of the open modal's fields stay inline, any other key (`spt`) closes it as a toast.
      * `$fokus` = id of the element to focus after success when the trigger may be gone. The actions call DiinputOleh::ingat() themselves.
      */
     private function jalankan(string $modal, string $pesan, callable $fn, ?string $fokus = null): void
@@ -225,14 +245,18 @@ class Detail extends Component
         return $spt;
     }
 
-    public function render(PenandaSpt $penanda, KesesuaianPkpt $kesesuaian, Settings $settings, TandaiSelesai $selesai)
+    public function render(PenandaSpt $penanda, KesesuaianPkpt $kesesuaian, Settings $settings, TandaiSelesai $selesai, BatalkanNomor $batal)
     {
         $spt = $this->spt();
         $item = $spt->pkptItem;
-        $laksanakan = auth()->user()->can('laksanakan', $spt);
-        $ubahSppd = auth()->user()->can('ubahSppd', $spt);
+        $user = auth()->user();
+        $laksanakan = $user->can('laksanakan', $spt);
+        $ubahSppd = $user->can('ubahSppd', $spt);
         $tahunSppd = $spt->tahun ?? now('Asia/Jakarta')->year;
-        $modal = $laksanakan ? $this->modal : '';
+        // Batalkan Penugasan: the owning Irban (Bagian Umum cancels from the Register); shown while Diterima, disabled with cegah()'s reason.
+        $tombolBatal = $user->role === Role::Irban && $user->can('batalkan', $spt) && $spt->status_pengajuan === StatusPengajuan::Diterima;
+        // The batal modal stays open after a Selesai in another tab, so its save still reaches the action and becomes a toast.
+        $modal = ($this->modal === 'batal' ? $tombolBatal : $laksanakan) ? $this->modal : '';
 
         return view('livewire.spt.detail', [
             'spt' => $spt,
@@ -244,6 +268,8 @@ class Detail extends Component
             'perubahanPenugasan' => $item?->perubahanPenugasan,
             'hariKerja' => $settings->get('penugasan.hitungan_hari') === 'kerja',
             'laksanakan' => $laksanakan,
+            'tombolBatal' => $tombolBatal,
+            'blokirBatal' => $tombolBatal ? $batal->cegah($spt) : null,
             'bisaUbah' => auth()->user()->can('update', $spt),
             'ubahSppd' => $ubahSppd,
             'tahunSppd' => $tahunSppd,

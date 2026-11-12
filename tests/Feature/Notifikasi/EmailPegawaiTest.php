@@ -117,10 +117,10 @@ class EmailPegawaiTest extends TestCase
     {
         Notification::swap(new ChannelManager($this->app)); // setUp faked it; this needs the real queue path
         $spt = $this->spt(Pegawai::factory()->create(), 'diterima');
-        $kirim = fn () => Notification::route('mail', 'p@example.test')->notify(new EmailPegawai(new NomorDibatalkan($spt, 'Salah ketik perihal'), 'Budi'));
+        $kirim = fn () => Notification::route('mail', 'p@example.test')->notify(new EmailPegawai(new NomorDibatalkan($spt, 'Salah ketik perihal', 'Bagian Umum'), 'Budi'));
         $terkirim = fn () => count(app('mailer')->getSymfonyTransport()->messages());
 
-        $this->assertInstanceOf(ShouldQueueAfterCommit::class, new EmailPegawai(new NomorDibatalkan($spt, 'x'), 'Budi'));
+        $this->assertInstanceOf(ShouldQueueAfterCommit::class, new EmailPegawai(new NomorDibatalkan($spt, 'x', 'Bagian Umum'), 'Budi'));
         try {
             DB::transaction(function () use ($kirim, $terkirim) {
                 $kirim();
@@ -138,7 +138,7 @@ class EmailPegawaiTest extends TestCase
     public function test_mail_has_greeting_closing_line_and_escapes(): void
     {
         $spt = $this->spt(Pegawai::factory()->create(), 'diterima');
-        $n = new EmailPegawai(new NomorDibatalkan($spt, 'Alasan [x](http://jahat)'), 'Dr. [Budi](http://x), M.Si.');
+        $n = new EmailPegawai(new NomorDibatalkan($spt, 'Alasan [x](http://jahat)', 'Bagian Umum'), 'Dr. [Budi](http://x), M.Si.');
         $mail = $n->toMail(new AnonymousNotifiable);
         $html = (string) $mail->render();
 
@@ -153,6 +153,6 @@ class EmailPegawaiTest extends TestCase
         $this->assertStringContainsString('Anda menerima email ini karena tercatat sebagai penginput data di SINTAS.', $html);
         $this->assertSame(['mail'], $n->via(new AnonymousNotifiable));
         // The ordinary email stays without greeting.
-        $this->assertStringNotContainsString('Yth.', (string) (new NomorDibatalkan($spt, 'Alasan lain'))->toMail($this->irbanUser)->render());
+        $this->assertStringNotContainsString('Yth.', (string) (new NomorDibatalkan($spt, 'Alasan lain', 'Bagian Umum'))->toMail($this->irbanUser)->render());
     }
 }

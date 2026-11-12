@@ -1,4 +1,4 @@
-{{-- The four Irban action modals of the SPT detail page (Exact values "Modals"). md size; footer: x-app.diinput-oleh full width (login.md §5),
+{{-- The Irban action modals (four `laksanakan` modals + Batalkan Penugasan) of the SPT detail page (Exact values "Modals"). md size; footer: x-app.diinput-oleh full width (login.md §5),
      then "Batal" + primary. Only the open modal ($aktif) renders its content, so ids such as `berkas` and `diinput_oleh` stay unique.
      Rules live in the actions; Tandai Selesai fields follow TandaiSelesai::syarat() and the block message TandaiSelesai::bisa(). No motion in forms (§7.5). --}}
 @use('App\Support\Tanggal')
@@ -8,6 +8,7 @@
     $ukuranBerkas = $berkas ? number_format(max(1, round($berkas->getSize() / 1024)), 0, ',', '.').' KB' : null;
 @endphp
 
+@if ($laksanakan)
 {{-- Ubah Tanggal Realisasi --}}
 <x-ui.modal name="aksi-tanggal" title="Ubah Tanggal Realisasi">
     @if ($aktif === 'tanggal')
@@ -120,3 +121,28 @@
         @endif
     </x-slot:footer>
 </x-ui.modal>
+@endif
+
+{{-- Batalkan Penugasan (versi 1.2.1 Task 4): owning Irban, before Selesai (BatalkanNomor::cegah()). Danger confirm; "Kembali" instead of "Batal" so the two buttons never read alike. --}}
+@if ($tombolBatal)
+<x-ui.modal name="aksi-batal" title="Batalkan Penugasan">
+    @if ($aktif === 'batal')
+        <form id="form-aksi-batal" wire:submit="batalkan" novalidate class="space-y-5">
+            @include('auth.partials.error-summary', ['class' => '', 'fields' => ['alasan' => 'Alasan pembatalan', 'diinput_oleh' => 'Diinput oleh']])
+            <p class="text-neutral-900">Nomor <span class="font-semibold tabular-nums [overflow-wrap:anywhere]">{{ $spt->nomor_lengkap }}</span> akan ditandai Dibatalkan. Bagian Umum dan Pimpinan menerima notifikasi beserta alasannya.</p>
+            <x-ui.alert variant="warning"><p>Nomor tidak dapat dipakai ulang.</p></x-ui.alert>
+            <div>
+                <x-ui.textarea label="Alasan pembatalan" name="alasan" wire:model="alasan" rows="4" maxlength="1000" required
+                    helper="Minimal 10 karakter." :error="$errors->first('alasan')" />
+                <x-ui.penghitung-karakter model="alasan" :value="$alasan" />
+            </div>
+        </form>
+    @endif
+    <x-slot:footer>
+        @if ($aktif === 'batal')
+            @include('livewire.spt.partials.aksi-footer', ['modal' => 'batal', 'tutup' => 'Kembali'])
+            <x-ui.button form="form-aksi-batal" variant="danger" icon="no-symbol" wire:loading.attr="disabled" wire:target="batalkan" class="max-sm:w-full">Batalkan Penugasan</x-ui.button>
+        @endif
+    </x-slot:footer>
+</x-ui.modal>
+@endif

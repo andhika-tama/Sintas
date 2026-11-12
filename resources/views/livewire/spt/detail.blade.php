@@ -1,7 +1,7 @@
 {{-- Shared SPT detail page (_shared.md §7). Header (h1 nomor + copy, status + flags, type/klasifikasi/irban, actions), perlu-kendala alert,
      ≥1024 an 8/4 grid; below that the two columns dissolve (`contents`) and `order-*` gives the mobile order Ringkasan, Riwayat, Kendala, Personel, Dokumen, Komentar.
      Komentar is the child component livewire:spt.komentar (last in DOM and visually); Log Aktivitas (Admin/Pimpinan only) is a collapsed card. No animation (§7.5) apart from the modal/toast transitions.
-     Action modals (Irban `laksanakan` only) are in the partial; `fokus-ke` (heard by the app layout's <main>) moves focus when a trigger is gone after an action. --}}
+     Action modals (Irban `laksanakan`, plus Batalkan Penugasan for the owning Irban) are in the partial; `fokus-ke` (heard by the app layout's <main>) moves focus when a trigger is gone after an action. --}}
 @use('App\Support\Tanggal')
 @use('App\Enums\KejadianSpt')
 @use('App\Actions\Spt\SimpanSpt')
@@ -46,13 +46,21 @@
             </div>
         </div>
 
-        @if ($laksanakan || $bisaUbah)
+        @if ($laksanakan || $bisaUbah || $tombolBatal)
             <div class="flex flex-wrap items-center gap-2 max-sm:[&>*]:w-full xl:max-w-[26rem] xl:shrink-0 xl:justify-end">
                 @if ($laksanakan)
                     <x-ui.button type="button" variant="secondary" icon="calendar-days" wire:click="buka('tanggal')">Ubah Tanggal</x-ui.button>
                     <x-ui.button type="button" variant="secondary" icon="arrow-up-tray" wire:click="buka('final')">Unggah SPT Final</x-ui.button>
                     <x-ui.button type="button" variant="secondary" icon="exclamation-circle" id="aksi-kendala" wire:click="buka('kendala')">{{ $kendalaLabel }}</x-ui.button>
                     <x-ui.button type="button" icon="check-circle" wire:click="buka('selesai')">Tandai Selesai</x-ui.button>
+                @endif
+                @if ($tombolBatal)
+                    {{-- Destructive (versi 1.2.1 Task 4): outline danger so Tandai Selesai stays the one primary; last on mobile, first from sm so it sits away from the primary. --}}
+                    <x-ui.button type="button" variant="danger-outline" icon="no-symbol" wire:click="buka('batal')" class="sm:order-first"
+                        :disabled="(bool) $blokirBatal" :aria-disabled="$blokirBatal ? 'true' : null" :aria-describedby="$blokirBatal ? 'batal-blokir' : null">Batalkan Penugasan</x-ui.button>
+                    @if ($blokirBatal)
+                        <p id="batal-blokir" class="basis-full text-sm text-neutral-600 xl:text-right">{{ $blokirBatal }}</p>
+                    @endif
                 @endif
                 @if ($bisaUbah)
                     <a href="{{ route('irban.spt.ubah', $spt) }}" wire:navigate class="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-mint-700 px-4 text-sm font-medium text-white hover:bg-mint-800 lg:h-10">
@@ -224,7 +232,9 @@
                                 <span aria-hidden="true" @class(['absolute top-1 left-0 size-4 rounded-full border-2 border-mint-700', 'bg-mint-700' => $loop->last, 'bg-white' => ! $loop->last])></span>
                                 <p class="font-semibold text-neutral-900">{{ KejadianSpt::label($r->kejadian) }}</p>
                                 <p class="text-xs text-neutral-500 tabular-nums">{{ $waktu($r->created_at) }}</p>
-                                <p class="text-neutral-600">{{ $r->olehUser?->name }}@if ($r->diinputOleh) · Diinput oleh {{ $r->diinputOleh->nama_bergelar }}@endif</p>
+                                {{-- Role prefix when the row records it (cancellation, versi 1.2.1 Task 4). --}}
+                                @php $peran = \App\Enums\Role::tryFrom((string) ($r->nilai_baru['peran'] ?? ''))?->label(); @endphp
+                                <p class="text-neutral-600">{{ $peran ? $peran.' · ' : '' }}{{ $r->olehUser?->name }}@if ($r->diinputOleh) · Diinput oleh {{ $r->diinputOleh->nama_bergelar }}@endif</p>
                                 @if ($r->kejadian === KejadianSpt::TANGGAL_DIUBAH)
                                     <p class="mt-1 tabular-nums text-neutral-900">{{ $rentangNilai($r->nilai_lama) }} → {{ $rentangNilai($r->nilai_baru) }}</p>
                                 @elseif ($r->kejadian === KejadianSpt::SPPD_DIUBAH)
@@ -277,7 +287,7 @@
         </div>
     </div>
 
-    @if ($laksanakan)
+    @if ($laksanakan || $tombolBatal)
         @include('livewire.spt.partials.aksi-modal')
     @endif
 </div>

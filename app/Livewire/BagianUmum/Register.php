@@ -119,11 +119,17 @@ class Register extends Component
         $this->dispatch('toast', type: 'success', message: "Nomor {$spt->nomor_lengkap} dicatat");
     }
 
-    public function bukaBatal(int $id): void
+    public function bukaBatal(int $id, BatalkanNomor $aksi): void
     {
         Gate::authorize('kelolaNomor', Spt::class);
-        $spt = Spt::where('status_pengajuan', StatusPengajuan::Diterima)->whereNotNull('nomor_urut')->find($id);
+        $spt = Spt::whereNotNull('nomor_urut')->find($id);
         if (! $spt) {
+            return;
+        }
+        Gate::authorize('batalkan', $spt);
+        if ($pesan = $aksi->cegah($spt)) {
+            $this->galatBatal($pesan);
+
             return;
         }
         $this->batalId = $spt->id;
@@ -137,10 +143,30 @@ class Register extends Component
         Gate::authorize('kelolaNomor', Spt::class);
         $this->resetErrorBag();
         $spt = Spt::whereNotNull('nomor_urut')->findOrFail($this->batalId ?? 0);
-        $aksi->handle(auth()->user(), $spt, $this->alasan);
+        try {
+            $aksi->handle(auth()->user(), $spt, $this->alasan);
+        } catch (ValidationException $e) {
+            // Stale tab (cancelled or Selesai elsewhere): the shared guard's `spt` message is a toast; `alasan` stays inline.
+            if (isset($e->errors()['spt'])) {
+                $this->galatBatal($e->errors()['spt'][0]);
+
+                return;
+            }
+            throw $e;
+        }
         $this->showBatal = false;
         $this->batalId = null;
         $this->dispatch('toast', type: 'success', message: "Nomor {$spt->nomor_lengkap} dibatalkan");
+        $this->dispatch('fokus-ke', id: 'judul-register'); // the row's button is gone
+    }
+
+    /** Non-field cancel error: close the modal, toast, focus the h1 (the row's button may be gone or disabled). */
+    private function galatBatal(string $pesan): void
+    {
+        $this->showBatal = false;
+        $this->batalId = null;
+        $this->dispatch('toast', type: 'error', message: $pesan);
+        $this->dispatch('fokus-ke', id: 'judul-register');
     }
 
     public function bukaAwal(): void
@@ -212,6 +238,7 @@ class Register extends Component
 
         return view('livewire.bagian-umum.register', [
             'register' => $register,
+            'pembatalan' => app(BatalkanNomor::class),
             'baris' => $register->query($this->filter())->paginate(self::PER_HALAMAN),
             'tahunList' => $tahunList,
             'irbanOptions' => Irban::orderBy('nama')->pluck('nama', 'id')->all(),

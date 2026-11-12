@@ -8,7 +8,7 @@
     $atur = fn () => '$set(\'cari\', \'\'); $set(\'status\', \'\'); $set(\'irban\', \'\'); $set(\'bulan\', \'\')';
 @endphp
 <div>
-    <x-ui.page-header title="Register Nomor SPT" description="Stambook digital nomor SPT tahun {{ $this->tahun }}. Nomor yang dibatalkan tetap tercatat dan tidak dipakai ulang.">
+    <x-ui.page-header title="Register Nomor SPT" title-id="judul-register" description="Stambook digital nomor SPT tahun {{ $this->tahun }}. Nomor yang dibatalkan tetap tercatat dan tidak dipakai ulang.">
         <x-slot:actions>
             <x-app.export-buttons>
                 <x-slot:tambahan>
@@ -118,8 +118,16 @@
                         <td><x-app.status-badge :status="$d['status']" /></td>
                         <td>
                             @if ($d['status'] === \App\Enums\StatusPengajuan::Diterima)
-                                <button type="button" wire:click="bukaBatal({{ $s->id }})" aria-label="Batalkan Nomor {{ $d['nomor'] }}" title="Batalkan Nomor"
-                                    class="inline-flex size-11 items-center justify-center rounded-md text-danger-700 hover:bg-neutral-50 lg:size-8">{{ svg('heroicon-m-no-symbol', 'size-5') }}</button>
+                                {{-- BatalkanNomor::cegah(): a Selesai SPT keeps a disabled button with the reason written beside it (versi 1.2.1 Task 4). --}}
+                                @php $blokir = $pembatalan->cegah($s); @endphp
+                                <div @class(['flex items-start gap-1', 'min-w-44' => $blokir])>
+                                    <button type="button" wire:click="bukaBatal({{ $s->id }})" aria-label="Batalkan Nomor {{ $d['nomor'] }}" title="Batalkan Nomor"
+                                        @if ($blokir) disabled aria-disabled="true" aria-describedby="batal-blokir-{{ $s->id }}" @endif
+                                        class="inline-flex size-11 shrink-0 items-center justify-center rounded-md text-danger-700 enabled:hover:bg-neutral-50 disabled:cursor-not-allowed disabled:text-neutral-400 lg:size-8">{{ svg('heroicon-m-no-symbol', 'size-5') }}</button>
+                                    @if ($blokir)
+                                        <p id="batal-blokir-{{ $s->id }}" class="pt-1 text-xs text-neutral-600">{{ $blokir }}</p>
+                                    @endif
+                                </div>
                             @endif
                         </td>
                         <td>@include('livewire.bagian-umum.partials.teks-panjang', ['teks' => $d['catatan'], 'id' => "catatan-{$s->id}"])</td>
@@ -175,9 +183,6 @@
         @if ($batal)
             <p class="text-neutral-900">Nomor <span class="font-semibold tabular-nums [overflow-wrap:anywhere]">{{ $batal->nomor_lengkap }}</span> akan ditandai Dibatalkan. Nomor tetap tercatat di register dan tidak akan dipakai ulang.</p>
         @endif
-        @error('spt')
-            <x-ui.alert variant="danger" class="mt-3">{{ $message }}</x-ui.alert>
-        @enderror
         <div class="mt-4">
             <x-ui.textarea label="Alasan pembatalan" name="alasan" id="alasan-batal" wire:model="alasan" rows="4" maxlength="1000" required autofocus
                 helper="Minimal 10 karakter." :error="$errors->first('alasan')" />

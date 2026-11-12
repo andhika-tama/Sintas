@@ -165,7 +165,8 @@ class RegisterTest extends TestCase
         $this->register()
             ->call('bukaBatal', $spt->id)->assertSet('showBatal', true)
             ->set('alasan', 'x')->call('batalkan')->assertHasErrors(['alasan'])
-            ->set('alasan', 'Salah ketik perihal SPT')->call('batalkan')->assertHasNoErrors()->assertSet('showBatal', false)->assertDispatched('toast');
+            ->set('alasan', 'Salah ketik perihal SPT')->call('batalkan')->assertHasNoErrors()->assertSet('showBatal', false)->assertDispatched('toast')
+            ->assertDispatched('fokus-ke', id: 'judul-register')->assertSeeHtml('id="judul-register" tabindex="-1"');
         $this->assertSame(StatusPengajuan::Dibatalkan, $spt->fresh()->status_pengajuan);
 
         $c = $this->register()->call('bukaManual')->assertSet('showManual', true)->assertSee('Gunakan hanya untuk SPT mendesak.')->assertSee('700 · Pengawasan Umum', false)

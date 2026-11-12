@@ -38,7 +38,7 @@ class NotifikasiSeeder extends Seeder
         // Irban: decisions on its submissions, a cancelled number, a late SPT (marked as notified, as the daily command would).
         $this->kirim($irban, fn ($s) => new PengajuanDiputuskan($s), $spt(StatusPengajuan::Diterima), 120, false);
         $this->kirim($irban, fn ($s) => new PengajuanDiputuskan($s, 'Lengkapi uraian objek dan periode yang diperiksa.'), $spt(StatusPengajuan::PerluRevisi), 1500, true);
-        $this->kirim($irban, fn ($s) => new NomorDibatalkan($s, 'Penugasan digabung ke SPT lain.'), $spt(StatusPengajuan::Dibatalkan), 4300, true);
+        $this->kirim($irban, fn ($s) => new NomorDibatalkan($s, 'Penugasan digabung ke SPT lain.', 'Bagian Umum'), $spt(StatusPengajuan::Dibatalkan), 4300, true);
         $terlambat = $spt(StatusPengajuan::Diterima, '%terlambat%');
         if ($this->kirim($irban, fn ($s) => new SptTerlambat($s, (int) app(Settings::class)->get('penanda.batas_terlambat_hari')), $terlambat, 30, false)) {
             $terlambat->forceFill(['terlambat_diberitahu_pada' => now()])->save();

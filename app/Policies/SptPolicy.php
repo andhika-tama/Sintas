@@ -46,7 +46,13 @@ class SptPolicy
         return $user->role === Role::BagianUmum && $spt->status_pengajuan === StatusPengajuan::MenungguNomor;
     }
 
-    /** Manual number entry, cancel number, register, starting number: Bagian Umum only. */
+    /** Cancel an issued number (versi 1.2.1 K4): Bagian Umum, or the Irban that owns the SPT. Role/ownership only; the state rule is BatalkanNomor::cegah(). */
+    public function batalkan(User $user, Spt $spt): bool
+    {
+        return $user->role === Role::BagianUmum || $this->milik($user, $spt);
+    }
+
+    /** Manual number entry, register, starting number: Bagian Umum only. */
     public function kelolaNomor(User $user): bool
     {
         return $user->role === Role::BagianUmum;

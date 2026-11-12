@@ -122,6 +122,7 @@
                                 <td class="min-w-48 !pl-10 before:absolute before:inset-y-0 before:left-6 before:w-0.5 before:bg-neutral-200">
                                     <a href="{{ $r['url'] }}" wire:navigate class="font-medium whitespace-nowrap text-mint-700 underline-offset-2 hover:underline">{{ $r['nomor_lengkap'] }}</a>
                                     <span class="block text-xs text-neutral-600 [overflow-wrap:anywhere]">{{ $r['jenis']['nama'] ?? 'Tanpa jenis penugasan' }} · {{ $r['irban'] }}</span>
+                                    <span class="block text-xs text-neutral-600 [overflow-wrap:anywhere]">{{ \App\Services\MonitoringSpt::timPpj($r, true) }}</span>
                                 </td>
                                 <td class="min-w-28 text-neutral-600">{{ $p ?? '–' }}</td>
                                 <td class="min-w-32">{{ $r['mulai'] && $r['selesai'] ? Tanggal::rentang($r['mulai'], $r['selesai']) : '–' }}</td>
@@ -161,6 +162,7 @@
                                     </span>
                                     <p class="text-sm text-neutral-600 tabular-nums">{{ $r['mulai'] && $r['selesai'] ? Tanggal::rentang($r['mulai'], $r['selesai']) : '–' }}</p>
                                     <a href="{{ $r['url'] }}" wire:navigate class="inline-flex min-h-11 items-center text-sm font-medium [overflow-wrap:anywhere] text-mint-700 underline-offset-2 hover:underline">{{ $r['nomor_lengkap'] }}</a>
+                                    <p class="text-xs text-neutral-600 [overflow-wrap:anywhere]">{{ \App\Services\MonitoringSpt::timPpj($r, true) }}</p>
                                 </li>
                             @endforeach
                         </ul>

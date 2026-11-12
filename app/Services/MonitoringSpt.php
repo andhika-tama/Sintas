@@ -55,7 +55,7 @@ class MonitoringSpt
      * Groups (items by effective start, then id; "Di luar PKPT" last; only groups with rows):
      *   {item_id: ?int, label: string, jenis: ?{id, nama, warna, warna_teks}, mulai: ?CarbonImmutable, selesai: ?CarbonImmutable, irban: ?string, spt: list<row>}
      * Row: {id, nomor_lengkap, tanggal_spt: ?CarbonImmutable, irban: string, jenis: ?{id, nama, warna, warna_teks}, mulai, selesai, kesesuaian: sesuai|tidak_sesuai|non_pkpt,
-     *   status: StatusSpt, penanda: list<string>, kendala: ?{kategori, uraian}, url}
+     *   status: StatusSpt, penanda: list<string>, tim: string, ppj: ?string, kendala: ?{kategori, uraian}, url}
      */
     public function baris(array $filter): array
     {
@@ -162,7 +162,7 @@ class MonitoringSpt
     private function spt(array $f): array
     {
         $spts = $this->query($f)
-            ->with(['irban:id,nama', 'jenisPenugasan', 'kendala', 'pkptItem.irban:id,nama', 'pkptItem.jenisPenugasan'])
+            ->with(['irban:id,nama', 'jenisPenugasan', 'kendala', 'personel.tim:id,nama', 'ppj:id,nama_bergelar', 'pkptItem.irban:id,nama', 'pkptItem.jenisPenugasan'])
             ->orderBy('tanggal_mulai')->orderBy('id')->get();
         $hari = now('Asia/Jakarta')->toDateString(); // once per call, not per row
         $hasil = [];
@@ -183,7 +183,7 @@ class MonitoringSpt
     public function barisSpt(Collection $spts): array
     {
         $spts = new EloquentCollection($spts->all());
-        $spts->loadMissing(['irban:id,nama', 'jenisPenugasan', 'kendala']);
+        $spts->loadMissing(['irban:id,nama', 'jenisPenugasan', 'kendala', 'personel.tim:id,nama', 'ppj:id,nama_bergelar']);
         $hari = now('Asia/Jakarta')->toDateString();
 
         return array_map(fn ($h) => $this->bentukBaris($h[0], $h[1], $h[2], $hari), $this->saring($spts, []));
@@ -202,9 +202,26 @@ class MonitoringSpt
             'kesesuaian' => $kesesuaian,
             'status' => $spt->status($hari),
             'penanda' => $flags,
+            'tim' => $this->namaTim($spt),
+            'ppj' => $spt->ppj?->nama_bergelar,
             'kendala' => $spt->kendala ? ['kategori' => $spt->kendala->kategori, 'uraian' => $spt->kendala->uraian] : null,
             'url' => route('spt.show', $spt->id),
         ];
+    }
+
+    /** Unique team names of the SPT personnel (natural order), "Tanpa tim" when no one belongs to a team. */
+    private function namaTim(Spt $spt): string
+    {
+        $nama = $spt->personel->map(fn ($p) => $p->tim?->nama)->filter()->unique()->all();
+        sort($nama, SORT_NATURAL | SORT_FLAG_CASE);
+
+        return $nama ? implode(' + ', $nama) : 'Tanpa tim';
+    }
+
+    /** The one text for "Tim · PPJ" (screen, PDF, Excel); `$tandaiPpj` appends " (PPJ)" after a PPJ name. */
+    public static function timPpj(array $baris, bool $tandaiPpj = false): string
+    {
+        return $baris['tim'].' · '.($baris['ppj'] === null ? '–' : $baris['ppj'].($tandaiPpj ? ' (PPJ)' : ''));
     }
 
     private function jenis(?JenisPenugasan $j): ?array

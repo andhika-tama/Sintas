@@ -2,14 +2,18 @@
 
 namespace Tests\Feature\Rekap;
 
+use App\Enums\PeranTim;
 use App\Enums\StatusSpt;
 use App\Models\Irban;
 use App\Models\JenisPenugasan;
 use App\Models\Komentar;
+use App\Models\Pegawai;
 use App\Models\PkptItem;
 use App\Models\Spt;
 use App\Models\SptDokumen;
 use App\Models\SptKendala;
+use App\Models\SptPersonel;
+use App\Models\Tim;
 use App\Models\User;
 use App\Services\MonitoringSpt;
 use App\Services\PenandaSpt;
@@ -307,6 +311,66 @@ class MonitoringSptTest extends TestCase
         }
         $this->assertCount(2, $monitoring->daftar(['irban' => $this->b->id]));
         $this->assertCount(1, $monitoring->daftar(['penanda' => 'terlambat']));
+    }
+
+    /** @param list<?string> $tim team name per personnel row (null = additional personnel without a team) */
+    private function personel(Spt $spt, array $tim, ?string $ppj = null): void
+    {
+        foreach ($tim as $i => $nama) {
+            SptPersonel::create(['spt_id' => $spt->id, 'pegawai_id' => Pegawai::factory()->create()->id, 'peran' => PeranTim::Anggota, 'urutan' => $i + 1, 'sumber' => 'tambahan',
+                'tim_id' => $nama ? Tim::firstOrCreate(['irban_id' => $spt->irban_id, 'tahun' => 2026, 'nama' => $nama])->id : null]);
+        }
+        $spt->forceFill(['ppj_pegawai_id' => $ppj ? Pegawai::factory()->create(['nama_bergelar' => $ppj])->id : null])->save();
+    }
+
+    private function baru(Spt $spt): array
+    {
+        return app(MonitoringSpt::class)->barisSpt(Spt::whereKey($spt->id)->get())[0];
+    }
+
+    public function test_tim_and_ppj_text(): void
+    {
+        $this->personel($this->m[1], ['Tim 1', 'Tim 1'], 'Maleha, S.H');
+        $this->personel($this->m[2], ['Tim B', 'Tim A', 'Tim 10', 'Tim 2']); // unique, natural order
+        $this->personel($this->m[3], [null, null]);
+
+        $r = $this->baru($this->m[1]);
+        $this->assertSame(['Tim 1', 'Maleha, S.H'], [$r['tim'], $r['ppj']]);
+        $this->assertSame('Tim 1 · Maleha, S.H (PPJ)', MonitoringSpt::timPpj($r, true));
+        $this->assertSame('Tim 1 · Maleha, S.H', MonitoringSpt::timPpj($r));
+
+        $r = $this->baru($this->m[2]);
+        $this->assertSame('Tim 2 + Tim 10 + Tim A + Tim B', $r['tim']);
+        $this->assertNull($r['ppj']);
+        $this->assertSame('Tim 2 + Tim 10 + Tim A + Tim B · –', MonitoringSpt::timPpj($r, true));
+
+        $this->assertSame('Tanpa tim', $this->baru($this->m[3])['tim']); // only additional personnel
+        $this->assertSame('Tanpa tim', $this->baru($this->m[4])['tim']); // no personnel at all
+        $this->assertSame('Tanpa tim · –', MonitoringSpt::timPpj($this->baru($this->m[4])));
+    }
+
+    public function test_tim_ppj_query_count_does_not_grow_with_spt(): void
+    {
+        $monitoring = app(MonitoringSpt::class);
+        $hitung = function () use ($monitoring) {
+            DB::flushQueryLog();
+            DB::enableQueryLog();
+            $monitoring->baris([]);
+            DB::disableQueryLog();
+
+            return count(DB::getQueryLog());
+        };
+        $this->personel($this->m[1], ['Tim 1'], 'Maleha, S.H'); // eager loads only run once some SPT has personnel/PPJ
+        $hitung(); // warm-up
+        $awal = $hitung();
+
+        foreach (range(1, 4) as $n) { // four more SPT, each with its own tim and PPJ
+            $spt = Spt::factory()->diterima()->create(['irban_id' => $this->a->id, 'pkpt_item_id' => $this->i[1]->id, 'jenis_penugasan_id' => $this->j1->id,
+                'tanggal_mulai' => '2026-03-05', 'tanggal_selesai' => '2026-03-20', 'dibuat_oleh' => User::factory()->create()->id]);
+            $this->personel($spt, ["Tim {$n}", "Tim {$n}"], "PPJ {$n}, S.H");
+        }
+
+        $this->assertSame($awal, $hitung());
     }
 
     public function test_query_count_is_constant(): void

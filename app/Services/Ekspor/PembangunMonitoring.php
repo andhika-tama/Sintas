@@ -14,7 +14,7 @@ use Illuminate\Support\Facades\Gate;
 /** Monitoring SPT export (pimpinan.md "Monitoring table"): one row per SPT, group label in Jenis Penugasan. Rows come from MonitoringSpt::baris(). */
 class PembangunMonitoring implements Pembangun
 {
-    public const KOLOM = ['Nomor SPT', 'Irban', 'Jenis Penugasan', 'Periode Penugasan (PKPT)', 'Realisasi Periode', 'Kesesuaian dengan Jadwal PKPT', 'Status', 'Permasalahan/Kendala'];
+    public const KOLOM = ['Nomor SPT', 'Irban', 'Tim · PPJ', 'Jenis Penugasan', 'Periode Penugasan (PKPT)', 'Realisasi Periode', 'Kesesuaian dengan Jadwal PKPT', 'Status', 'Permasalahan/Kendala'];
 
     /** Labels of the MonitoringSpt::STATUS filter values (page select, PDF filter summary). */
     public const STATUS = ['berjalan' => 'Berjalan', 'selesai' => 'Selesai', 'siap_dilaksanakan' => 'Siap Dilaksanakan', 'pelaksanaan' => 'Pelaksanaan', 'penyusunan_laporan' => 'Penyusunan Laporan'];
@@ -57,8 +57,11 @@ class PembangunMonitoring implements Pembangun
 
     public function html(User $user, array $filter): string
     {
+        // The PDF has no Tim · PPJ column: it sits under the Irban name (second line, with the PPJ marker), so the view gets the rows minus column 3.
+        $baris = $this->baris($filter, true);
+
         return view('pdf.monitoring-spt', [
-            'tahun' => $filter['tahun'], 'filter' => $this->ringkasan($filter), 'kolom' => self::KOLOM, 'baris' => $this->baris($filter),
+            'tahun' => $filter['tahun'], 'filter' => $this->ringkasan($filter), 'kolom' => array_values(array_diff_key(self::KOLOM, [2 => 1])), 'baris' => $baris,
             'dibuat' => now('Asia/Jakarta')->translatedFormat('d F Y H:i').' WIB',
         ])->render();
     }
@@ -75,14 +78,14 @@ class PembangunMonitoring implements Pembangun
     }
 
     /** @return list<list<?string>> */
-    private function baris(array $filter): array
+    private function baris(array $filter, bool $untukPdf = false): array
     {
         $out = [];
         foreach ($this->grup($filter) as $g) {
             $pkpt = $g['mulai'] ? Tanggal::rentang($g['mulai'], $g['selesai']) : '–';
             foreach ($g['spt'] as $r) {
                 $out[] = [
-                    $r['nomor_lengkap'], $r['irban'], $g['label'], $pkpt,
+                    $r['nomor_lengkap'], $untukPdf ? [$r['irban'], MonitoringSpt::timPpj($r, true)] : $r['irban'], ...($untukPdf ? [] : [MonitoringSpt::timPpj($r)]), $g['label'], $pkpt,
                     $r['mulai'] && $r['selesai'] ? Tanggal::rentang($r['mulai'], $r['selesai']) : '–',
                     self::KESESUAIAN[$r['kesesuaian']], self::labelStatus($r),
                     $r['kendala'] ? "{$r['kendala']['kategori']}: {$r['kendala']['uraian']}" : null,

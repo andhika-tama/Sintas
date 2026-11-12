@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Rekap;
 
+use App\Enums\PeranTim;
 use App\Enums\Role;
 use App\Jobs\BuatEkspor;
 use App\Livewire\Pimpinan\Monitoring;
@@ -9,10 +10,13 @@ use App\Models\Ekspor as EksporModel;
 use App\Models\Irban;
 use App\Models\JenisPenugasan;
 use App\Models\Komentar;
+use App\Models\Pegawai;
 use App\Models\Pkpt;
 use App\Models\PkptItem;
 use App\Models\Spt;
 use App\Models\SptKendala;
+use App\Models\SptPersonel;
+use App\Models\Tim;
 use App\Models\User;
 use App\Services\Ekspor;
 use App\Services\Ekspor\PembangunMonitoring;
@@ -79,6 +83,11 @@ class HalamanMonitoringTest extends TestCase
         SptKendala::factory()->create(['spt_id' => $this->m[2]->id, 'kategori' => 'Objek tidak siap',
             'uraian' => 'Objek sedang diaudit BPK sehingga dokumen pendukung belum dapat diserahkan kepada tim pemeriksa sampai akhir bulan.']);
         Komentar::factory()->mintaPenjelasan()->create(['spt_id' => $this->m[5]->id]);
+        // m2: Tim 1 with PPJ; the others have no personnel (Tanpa tim) and no PPJ.
+        $ppj = Pegawai::factory()->create(['nama_bergelar' => 'Maleha, S.H']);
+        SptPersonel::create(['spt_id' => $this->m[2]->id, 'pegawai_id' => $ppj->id, 'peran' => PeranTim::Anggota, 'urutan' => 1, 'sumber' => 'tambahan',
+            'tim_id' => Tim::factory()->create(['irban_id' => $this->a->id, 'nama' => 'Tim 1'])->id]);
+        $this->m[2]->forceFill(['ppj_pegawai_id' => $ppj->id])->save();
     }
 
     private function halaman(array $query = [])
@@ -285,16 +294,28 @@ class HalamanMonitoringTest extends TestCase
         $r = app(Ekspor::class)->minta($this->pimpinan, 'monitoring', 'xlsx', ['irban' => (string) $this->a->id]);
         $sheet = array_slice(IOFactory::load($r->getFile()->getPathname())->getActiveSheet()->toArray(), 3); // rows 1-3: title, filter, Dibuat
 
-        $this->assertSame(['Nomor SPT', 'Irban', 'Jenis Penugasan', 'Periode Penugasan (PKPT)', 'Realisasi Periode', 'Kesesuaian dengan Jadwal PKPT', 'Status', 'Permasalahan/Kendala'], $sheet[0]);
+        $this->assertSame(['Nomor SPT', 'Irban', 'Tim · PPJ', 'Jenis Penugasan', 'Periode Penugasan (PKPT)', 'Realisasi Periode', 'Kesesuaian dengan Jadwal PKPT', 'Status', 'Permasalahan/Kendala'], $sheet[0]);
         $this->assertCount(3, $sheet); // m1, m2 (Irban B's m5 and 2025's m9 filtered out)
-        $this->assertSame([$this->m[1]->nomor_lengkap, 'Irban A', 'Jenis Satu', '1–31 Maret 2026', '5–20 Maret 2026', 'Sesuai', 'Selesai', null], $sheet[1]);
-        $this->assertSame([$this->m[2]->nomor_lengkap, 'Irban A', 'Jenis Satu', '1–31 Maret 2026', '25 Maret – 5 April 2026', 'Tidak Sesuai PKPT', 'Penyusunan Laporan, Terlambat',
+        $this->assertSame([$this->m[1]->nomor_lengkap, 'Irban A', 'Tanpa tim · –', 'Jenis Satu', '1–31 Maret 2026', '5–20 Maret 2026', 'Sesuai', 'Selesai', null], $sheet[1]);
+        $this->assertSame([$this->m[2]->nomor_lengkap, 'Irban A', 'Tim 1 · Maleha, S.H', 'Jenis Satu', '1–31 Maret 2026', '25 Maret – 5 April 2026', 'Tidak Sesuai PKPT', 'Penyusunan Laporan, Terlambat',
             'Objek tidak siap: Objek sedang diaudit BPK sehingga dokumen pendukung belum dapat diserahkan kepada tim pemeriksa sampai akhir bulan.'], $sheet[2]);
 
         $semua = app(Ekspor::class)->minta($this->pimpinan, 'monitoring', 'xlsx', []);
         $this->assertStringContainsString('monitoring-spt-2026.xlsx', $semua->headers->get('content-disposition'));
         $rows = array_slice(IOFactory::load($semua->getFile()->getPathname())->getActiveSheet()->toArray(), 3); // rows 1-3: title, filter, Dibuat
-        $this->assertSame([$this->m[5]->nomor_lengkap, 'Irban B', 'Di luar PKPT', '–', '10–20 Desember 2026', 'Non-PKPT', 'Pelaksanaan', null], $rows[3]);
+        $this->assertSame([$this->m[5]->nomor_lengkap, 'Irban B', 'Tanpa tim · –', 'Di luar PKPT', '–', '10–20 Desember 2026', 'Non-PKPT', 'Pelaksanaan', null], $rows[3]);
+    }
+
+    public function test_tim_ppj_shows_in_both_views_and_in_the_pdf(): void
+    {
+        foreach (['pkpt', 'spt'] as $tampilan) {
+            $this->halaman(['tampilan' => $tampilan, 'tahun' => '2026'])->assertSee('Tim 1 · Maleha, S.H (PPJ)')->assertSee('Tanpa tim · –');
+        }
+
+        $html = app(PembangunMonitoring::class)->html($this->pimpinan, app(MonitoringSpt::class)->filter([]));
+        $this->assertStringContainsString('Tim 1 · Maleha, S.H (PPJ)', $html);
+        $this->assertStringNotContainsString('<th>Tim · PPJ</th>', $html);
+        $this->assertStringContainsString('<th>Irban</th>', $html);
     }
 
     public function test_direct_export_reads_the_rows_once(): void

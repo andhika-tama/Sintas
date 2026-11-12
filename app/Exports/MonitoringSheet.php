@@ -35,7 +35,7 @@ class MonitoringSheet extends DefaultValueBinder implements FromArray, WithColum
     public const BARIS_HEADER = 4;
 
     /** Width type per PembangunMonitoring::KOLOM column (RekapSheet::LEBAR keys). */
-    private const TIPE = ['nomor', 'teks', 'panjang', 'tanggal', 'tanggal', 'teks', 'teks', 'panjang'];
+    private const TIPE = ['nomor', 'teks', 'teks', 'panjang', 'tanggal', 'tanggal', 'teks', 'teks', 'panjang'];
 
     /** Wrapped in the sheet; every body column that holds free text or a multi-line list. */
     private const BUNGKUS = ['teks', 'tanggal', 'panjang'];

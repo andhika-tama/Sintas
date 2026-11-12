@@ -72,7 +72,7 @@ class MonitoringSheetTest extends TestCase
         $this->assertSame('FFFFFFFF', $h->getFont()->getColor()->getARGB());
         $this->assertSame(Alignment::HORIZONTAL_CENTER, $h->getAlignment()->getHorizontal());
 
-        $tipe = ['nomor', 'teks', 'panjang', 'tanggal', 'tanggal', 'teks', 'teks', 'panjang'];
+        $tipe = ['nomor', 'teks', 'teks', 'panjang', 'tanggal', 'tanggal', 'teks', 'teks', 'panjang'];
         foreach ($tipe as $i => $t) {
             $this->assertEquals(RekapSheet::LEBAR[$t], $s->getColumnDimensionByColumn($i + 1)->getWidth(), 'kolom '.($i + 1));
         }

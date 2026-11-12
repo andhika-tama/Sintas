@@ -23,7 +23,7 @@
         <thead><tr>@foreach ($kolom as $k)<th>{{ $k }}</th>@endforeach</tr></thead>
         <tbody>
             @forelse ($baris as $b)
-                <tr>@foreach ($b as $sel)<td>{{ $sel ?? '–' }}</td>@endforeach</tr>
+                <tr>@foreach ($b as $sel)<td>@if (is_array($sel))<strong>{{ $sel[0] }}</strong><br><span style="font-size: 8px; color: #4B5955;">{{ $sel[1] }}</span>@else{{ $sel ?? '–' }}@endif</td>@endforeach</tr>
             @empty
                 <tr><td colspan="{{ count($kolom) }}">Tidak ada SPT sesuai filter.</td></tr>
             @endforelse

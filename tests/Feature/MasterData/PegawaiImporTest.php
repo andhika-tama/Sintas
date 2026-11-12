@@ -284,7 +284,7 @@ class PegawaiImporTest extends TestCase
         file_put_contents($path, base64_decode($c->effects['download']['content']));
         $sheet = IOFactory::load($path)->getActiveSheet();
         $this->assertSame('@', $sheet->getColumnStyle('B')->getNumberFormat()->getFormatCode());
-        $this->assertNull($sheet->getColumnStyle('A')); // kontrol: hanya kolom NIP
+        $this->assertSame('General', $sheet->getColumnStyle('A')->getNumberFormat()->getFormatCode()); // kontrol: hanya kolom NIP
     }
 
     public function test_berkas_hanya_judul_ditolak(): void

@@ -68,7 +68,7 @@ class HalamanImporTest extends TestCase
         foreach (['A', 'K', 'L', 'M', 'N'] as $col) {
             $this->assertSame('@', $sheet->getColumnStyle($col)->getNumberFormat()->getFormatCode(), $col);
         }
-        $this->assertNull($sheet->getColumnStyle('B'));
+        $this->assertSame('General', $sheet->getColumnStyle('B')->getNumberFormat()->getFormatCode()); // widths now give every column a style, but not the text format
     }
 
     public function test_alur_unggah_pratinjau_impor(): void

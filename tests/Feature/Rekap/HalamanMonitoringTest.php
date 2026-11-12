@@ -283,7 +283,7 @@ class HalamanMonitoringTest extends TestCase
         $this->halaman(['irban' => (string) $this->a->id])->call('ekspor', 'xlsx')->assertFileDownloaded('monitoring-spt-2026-irban-INSPEKTORAT-I.xlsx');
 
         $r = app(Ekspor::class)->minta($this->pimpinan, 'monitoring', 'xlsx', ['irban' => (string) $this->a->id]);
-        $sheet = IOFactory::load($r->getFile()->getPathname())->getActiveSheet()->toArray();
+        $sheet = array_slice(IOFactory::load($r->getFile()->getPathname())->getActiveSheet()->toArray(), 3); // rows 1-3: title, filter, Dibuat
 
         $this->assertSame(['Nomor SPT', 'Irban', 'Jenis Penugasan', 'Periode Penugasan (PKPT)', 'Realisasi Periode', 'Kesesuaian dengan Jadwal PKPT', 'Status', 'Permasalahan/Kendala'], $sheet[0]);
         $this->assertCount(3, $sheet); // m1, m2 (Irban B's m5 and 2025's m9 filtered out)
@@ -293,7 +293,7 @@ class HalamanMonitoringTest extends TestCase
 
         $semua = app(Ekspor::class)->minta($this->pimpinan, 'monitoring', 'xlsx', []);
         $this->assertStringContainsString('monitoring-spt-2026.xlsx', $semua->headers->get('content-disposition'));
-        $rows = IOFactory::load($semua->getFile()->getPathname())->getActiveSheet()->toArray();
+        $rows = array_slice(IOFactory::load($semua->getFile()->getPathname())->getActiveSheet()->toArray(), 3); // rows 1-3: title, filter, Dibuat
         $this->assertSame([$this->m[5]->nomor_lengkap, 'Irban B', 'Di luar PKPT', '–', '10–20 Desember 2026', 'Non-PKPT', 'Pelaksanaan', null], $rows[3]);
     }
 
@@ -321,7 +321,7 @@ class HalamanMonitoringTest extends TestCase
             if ($format === 'pdf') {
                 TestResponse::fromBaseResponse($r)->streamedContent();
             } else {
-                $this->assertCount(3, IOFactory::load($r->getFile()->getPathname())->getActiveSheet()->toArray());
+                $this->assertCount(3, array_slice(IOFactory::load($r->getFile()->getPathname())->getActiveSheet()->toArray(), 3));
             }
             $this->assertCount(1, $hitung, $format);
         }
@@ -338,7 +338,7 @@ class HalamanMonitoringTest extends TestCase
     {
         $this->m[2]->forceFill(['nomor_lengkap' => '700/002/X'])->save();
         $p = app(PembangunMonitoring::class);
-        $sheet = IOFactory::load(app(Ekspor::class)->minta($this->pimpinan, 'monitoring', 'xlsx', ['cari' => ' 700 '])->getFile()->getPathname())->getActiveSheet()->toArray();
+        $sheet = array_slice(IOFactory::load(app(Ekspor::class)->minta($this->pimpinan, 'monitoring', 'xlsx', ['cari' => ' 700 '])->getFile()->getPathname())->getActiveSheet()->toArray(), 3); // rows 1-3: title, filter, Dibuat
 
         $this->assertCount(2, $sheet); // header + m2 only
         $this->assertSame('700/002/X', $sheet[1][0]);

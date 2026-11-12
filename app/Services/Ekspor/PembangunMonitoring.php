@@ -2,7 +2,7 @@
 
 namespace App\Services\Ekspor;
 
-use App\Exports\ArrayExport;
+use App\Exports\MonitoringSheet;
 use App\Models\Irban;
 use App\Models\JenisPenugasan;
 use App\Models\Spt;
@@ -50,9 +50,9 @@ class PembangunMonitoring implements Pembangun
         return "monitoring-spt-{$filter['tahun']}".($kode ? "-irban-{$kode}" : '');
     }
 
-    public function export(User $user, array $filter): ArrayExport
+    public function export(User $user, array $filter): MonitoringSheet
     {
-        return new ArrayExport(self::KOLOM, $this->baris($filter), ['A']);
+        return new MonitoringSheet($filter['tahun'], $this->ringkasan($filter), $this->baris($filter), now('Asia/Jakarta')->translatedFormat('d F Y H:i').' WIB');
     }
 
     public function html(User $user, array $filter): string

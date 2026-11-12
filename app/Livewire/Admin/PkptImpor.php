@@ -121,7 +121,7 @@ class PkptImpor extends Component
     {
         Gate::authorize('manage-master-data');
 
-        return Excel::download(new ArrayExport(PkptItemImportParser::HEADERS, []), 'templat-item-pkpt.xlsx');
+        return Excel::download(new ArrayExport(PkptItemImportParser::HEADERS, [], [], ['A' => 7, 'B' => 17, 'C' => 15, 'D' => 17, 'E' => 40, 'F' => 12]), 'templat-item-pkpt.xlsx');
     }
 
     public function unduhGalat()
@@ -134,7 +134,7 @@ class PkptImpor extends Component
             }
         }
 
-        return Excel::download(new ArrayExport(['Baris', 'Kolom', 'Pesan'], $out), 'galat-impor-pkpt.xlsx');
+        return Excel::download(new ArrayExport(['Baris', 'Kolom', 'Pesan'], $out, [], ['A' => 10, 'B' => 22, 'C' => 80], ['C']), 'galat-impor-pkpt.xlsx');
     }
 
     #[Computed]

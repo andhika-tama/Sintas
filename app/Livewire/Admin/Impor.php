@@ -119,7 +119,7 @@ class Impor extends Component
             return "{$kolom}:{$kolom}";
         }, SptImportParser::TEXT_COLUMNS);
 
-        return Excel::download(new ArrayExport(SptImportParser::HEADERS, [], $huruf), 'templat-impor-spt.xlsx');
+        return Excel::download(new ArrayExport(SptImportParser::HEADERS, [], $huruf, ['A' => 11, 'B' => 13, 'C' => 7, 'D' => 13, 'E' => 17, 'F' => 40, 'G' => 40, 'H' => 40, 'I' => 15, 'J' => 17, 'K' => 16, 'L' => 11, 'M' => 40, 'N' => 11, 'O' => 13, 'P' => 9, 'Q' => 18, 'R' => 40]), 'templat-impor-spt.xlsx');
     }
 
     public function unduhGalat()
@@ -132,7 +132,7 @@ class Impor extends Component
             }
         }
 
-        return Excel::download(new ArrayExport(['Baris', 'Kolom', 'Pesan'], $out), 'galat-impor-spt.xlsx');
+        return Excel::download(new ArrayExport(['Baris', 'Kolom', 'Pesan'], $out, [], ['A' => 10, 'B' => 22, 'C' => 80], ['C']), 'galat-impor-spt.xlsx');
     }
 
     /** Changes the step and moves focus to the step heading: the control that triggered it is gone after the morph. */

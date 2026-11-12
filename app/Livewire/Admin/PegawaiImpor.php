@@ -105,7 +105,7 @@ class PegawaiImpor extends Component
     {
         Gate::authorize('manage-master-data');
 
-        return Excel::download(new ArrayExport(PegawaiImportParser::HEADERS, [], ['B:B']), 'templat-pegawai.xlsx');
+        return Excel::download(new ArrayExport(PegawaiImportParser::HEADERS, [], ['B:B'], ['A' => 30, 'B' => 22, 'C' => 20, 'D' => 10, 'E' => 30, 'F' => 28, 'G' => 7]), 'templat-pegawai.xlsx');
     }
 
     public function unduhGalat()
@@ -118,7 +118,7 @@ class PegawaiImpor extends Component
             }
         }
 
-        return Excel::download(new ArrayExport(['Baris', 'Kolom', 'Pesan'], $out), 'galat-impor-pegawai.xlsx');
+        return Excel::download(new ArrayExport(['Baris', 'Kolom', 'Pesan'], $out, [], ['A' => 10, 'B' => 22, 'C' => 80], ['C']), 'galat-impor-pegawai.xlsx');
     }
 
     #[Computed]

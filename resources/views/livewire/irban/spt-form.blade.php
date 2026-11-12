@@ -226,7 +226,7 @@
                     @if ($personel)
                         <ol wire:sort="pindah" wire:sort:config="{ animation: matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 150 }"
                             aria-label="Susunan personel, urutan sesuai SPT" aria-describedby="personel-bantuan" class="space-y-2">
-                            @foreach ($personel as $i => $row)
+                            @foreach ($personel as $row)
                                 @php
                                     $p = $pegawai[$row['pegawai_id']] ?? null;
                                     $nama = $p?->nama_bergelar ?? 'Pegawai';
@@ -246,7 +246,7 @@
                                             aria-label="Pindahkan {{ $nama }} ke bawah" @if ($loop->last) aria-disabled="true" @endif>{{ svg('heroicon-m-chevron-down', 'size-5') }}</button>
                                     </span>
                                     <label class="inline-flex size-11 shrink-0 cursor-pointer items-center justify-center lg:size-8">
-                                        <input type="checkbox" wire:model.live="personel.{{ $i }}.ikut" data-fokus="ikut"
+                                        <input type="checkbox" @checked($row['ikut']) wire:change="aturIkut({{ $row['pegawai_id'] }}, $event.target.checked)" data-fokus="ikut"
                                             class="size-5 rounded-sm border-border-strong text-mint-700 focus:ring-2 focus:ring-mint-600 focus:ring-offset-2">
                                         <span class="sr-only">Ikutkan {{ $nama }}</span>
                                     </label>
@@ -259,7 +259,7 @@
                                         </p>
                                     </div>
                                     <x-ui.segmented :name="'peran-'.$row['pegawai_id']" :legend="'Peran untuk '.$nama" :options="$peranLabel" :value="$row['peran']"
-                                        wire:model.live="personel.{{ $i }}.peran" data-fokus="peran" class="max-sm:order-last" />
+                                        wire:change="aturPeran({{ $row['pegawai_id'] }}, $event.target.value)" data-fokus="peran" class="max-sm:order-last" />
                                     <button type="button" wire:click="hapus({{ $row['pegawai_id'] }})" data-fokus="hapus" class="{{ $iconBtn }} ml-auto"
                                         aria-label="Hapus {{ $nama }} dari susunan">{{ svg('heroicon-m-x-mark', 'size-5') }}</button>
                                 </li>

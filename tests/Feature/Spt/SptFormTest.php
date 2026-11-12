@@ -198,6 +198,78 @@ class SptFormTest extends TestCase
         $this->assertSame([$this->ppj->id, $this->citra->id], array_column($page->get('personel'), 'pegawai_id'));
     }
 
+    /** 1.2.1 Task 1: reorder + outsider + remove, then late updates addressed by an old position, must never 500. */
+    public function test_susunan_personel_tahan_urut_tambah_hapus_dan_indeks_basi(): void
+    {
+        $tim = $this->tim('Tim 3', [[$this->ppj, 'supervisor_dalnis'], [$this->budi, 'ketua'], [$this->citra, 'anggota']]);
+        $luar = Pegawai::factory()->create(['nama_bergelar' => 'Dewi Kartika']);
+        $page = $this->form()
+            ->set('diinput_oleh', $this->budi->id)->set('klasifikasi_id', $this->klas('REGULER'))
+            ->set('kode_arsip_id', KodeArsip::where('kode', '700')->value('id'))->set('pkpt_item_id', $this->item->id)
+            ->set('objek_ids', [$this->objek->id])->set('periode_diperiksa', 'Tahun Anggaran 2025')
+            ->set('tanggal_mulai', '2026-03-02')->set('tanggal_selesai', '2026-03-10')
+            ->call('toggleTim', $tim->id)->assertOk()
+            ->set('tambahId', $luar->id)->assertOk()
+            ->call('pindah', $luar->id, 0)->assertOk()
+            ->call('naik', $this->citra->id)->assertOk()
+            ->call('turun', $this->ppj->id)->assertOk()
+            ->call('hapus', $this->citra->id)->assertOk();
+        $this->assertSame([$luar->id, $this->ppj->id, $this->budi->id], array_column($page->get('personel'), 'pegawai_id'));
+
+        // Late requests still addressed by the old last position (3), alone and together with an action in one request.
+        $page->set('personel.3.peran', 'ketua')->assertOk()
+            ->set('personel.3.ikut', false)->assertOk()
+            ->update(calls: [['method' => 'hapus', 'params' => [$this->citra->id], 'path' => '']], updates: ['personel.3.peran' => 'ketua'])->assertOk()
+            ->call('aturPeran', $this->ppj->id, 'anggota')->assertOk()
+            ->call('aturIkut', $luar->id, false)->assertOk()
+            ->call('aturIkut', $luar->id, true)->assertOk();
+        $personel = $page->get('personel');
+        $this->assertSame([$luar->id, $this->ppj->id, $this->budi->id], array_column($personel, 'pegawai_id'));
+        $this->assertSame(['anggota', 'anggota', 'ketua'], array_column($personel, 'peran'));
+        foreach ($personel as $row) {
+            $this->assertIsInt($row['pegawai_id']);
+            $this->assertTrue($row['ikut']);
+        }
+
+        $page->call('simpan')->assertOk()->assertHasNoErrors();
+        $this->assertSame([$luar->id, $this->ppj->id, $this->budi->id], Spt::sole()->personel->pluck('pegawai_id')->all());
+        $page->call('ajukan')->assertHasNoErrors()->assertRedirect(route('irban.spt'));
+        $spt = Spt::sole();
+        $this->assertSame([$luar->id, $this->ppj->id, $this->budi->id], $spt->personel->pluck('pegawai_id')->all());
+        $this->assertSame([1, 2, 3], $spt->personel->pluck('urutan')->all());
+        $this->assertNotContains($this->citra->id, $spt->personel->pluck('pegawai_id')->all());
+    }
+
+    /** Review Focus 1: a late action for a pegawai removed a moment ago is a no-op. */
+    public function test_aksi_untuk_pegawai_yang_sudah_dihapus_adalah_noop(): void
+    {
+        $page = $this->form()->call('toggleTim', $this->tim1->id)->call('toggleTim', $this->tim2->id)->call('hapus', $this->citra->id);
+        $sebelum = $page->get('personel');
+        $page->call('pindah', $this->citra->id, 0)->assertOk()
+            ->call('naik', $this->citra->id)->assertOk()
+            ->call('turun', $this->citra->id)->assertOk()
+            ->call('aturPeran', $this->citra->id, 'ketua')->assertOk()
+            ->call('aturIkut', $this->citra->id, false)->assertOk()
+            ->assertNotDispatched('personel-dipindah');
+        $this->assertSame($sebelum, $page->get('personel'));
+
+        // Unknown roles are ignored silently.
+        $page->call('aturPeran', $this->budi->id, 'bos')->assertOk();
+        $this->assertSame($sebelum, $page->get('personel'));
+    }
+
+    public function test_baris_personel_rusak_dirapikan_sebelum_render(): void
+    {
+        $page = $this->form()->set('personel', [
+            ['peran' => 'ketua', 'ikut' => true],
+            ['pegawai_id' => $this->budi->id, 'peran' => 'ketua', 'sumber' => 'tambahan', 'tim_id' => null],
+        ])->assertOk()->assertSee('Budi Santoso');
+        $personel = $page->get('personel');
+        $this->assertCount(1, $personel);
+        $this->assertSame($this->budi->id, $personel[0]['pegawai_id']);
+        $this->assertTrue($personel[0]['ikut']);
+    }
+
     public function test_add_other_pegawai_as_anggota_and_dedupe(): void
     {
         $lain = Pegawai::factory()->create(['nama_bergelar' => 'Dewi Kartika', 'jabatan' => 'Auditor Muda']);

@@ -148,6 +148,9 @@ class SptForm extends Component
     {
         $this->irban();
         $this->berubah = true;
+        if (explode('.', $prop)[0] === 'personel') {
+            $this->rapikanPersonel(); // a late positional update must not leave a broken row for the actions in the same request
+        }
         if ($prop === 'klasifikasi_id' && $this->klasifikasi()?->wajib_item_pkpt) {
             $this->non_pkpt = false;
         }
@@ -250,6 +253,27 @@ class SptForm extends Component
         $this->berubah = true;
     }
 
+    /** Rows are addressed by pegawai id, never by position: a DOM row keeps its first wire:model index after a reorder (1.2.1 Task 1). */
+    public function aturPeran(int $pegawaiId, string $peran): void
+    {
+        $this->irban();
+        if (($i = $this->indeks($pegawaiId)) === null || ! PeranTim::tryFrom($peran)) {
+            return;
+        }
+        $this->personel[$i]['peran'] = $peran;
+        $this->berubah = true;
+    }
+
+    public function aturIkut(int $pegawaiId, bool $ikut): void
+    {
+        $this->irban();
+        if (($i = $this->indeks($pegawaiId)) === null) {
+            return;
+        }
+        $this->personel[$i]['ikut'] = $ikut;
+        $this->berubah = true;
+    }
+
     public function hapusLampiran(): void
     {
         $this->irban();
@@ -292,6 +316,7 @@ class SptForm extends Component
     private function kirim(SimpanSpt $action, string $mode): ?Spt
     {
         $user = $this->irban();
+        $this->rapikanPersonel();
         $spt = $this->sptId ? Spt::where('irban_id', $user->irban_id)->findOrFail($this->sptId) : null;
         $this->resetValidation();
         try {
@@ -332,9 +357,29 @@ class SptForm extends Component
 
     private function indeks(int $pegawaiId): ?int
     {
-        $i = array_search($pegawaiId, array_column($this->personel, 'pegawai_id'), true);
+        foreach ($this->personel as $i => $r) {
+            if (($r['pegawai_id'] ?? null) === $pegawaiId) {
+                return $i;
+            }
+        }
 
-        return $i === false ? null : $i;
+        return null;
+    }
+
+    /** Guard against client-sent rows: drop rows without a valid or with a repeated pegawai_id, fill missing keys, reindex. */
+    private function rapikanPersonel(): void
+    {
+        $dilihat = [];
+        $rapi = [];
+        foreach ($this->personel as $r) {
+            $id = is_array($r) ? filter_var($r['pegawai_id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]) : false;
+            if ($id === false || isset($dilihat[$id])) {
+                continue;
+            }
+            $dilihat[$id] = true;
+            $rapi[] = ['pegawai_id' => $id] + $r + ['peran' => PeranTim::Anggota->value, 'sumber' => 'tambahan', 'tim_id' => null, 'ikut' => true];
+        }
+        $this->personel = $rapi;
     }
 
     private function klasifikasi(): ?Klasifikasi
@@ -373,6 +418,7 @@ class SptForm extends Component
     public function render(SimpanSpt $action, ValidatePersonel $validatePersonel, KesesuaianPkpt $kesesuaian)
     {
         $user = $this->irban();
+        $this->rapikanPersonel();
         $tahun = DiinputOleh::tahun();
         $spt = $this->sptId ? Spt::with('dokumen')->where('irban_id', $user->irban_id)->find($this->sptId) : null;
         $items = PkptItem::aktif()->with(['jenisPenugasan', 'pkpt'])->where('irban_id', $user->irban_id)

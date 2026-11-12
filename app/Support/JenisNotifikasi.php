@@ -11,6 +11,7 @@ class JenisNotifikasi
         'pengajuan_perlu_revisi' => ['ikon' => 'pencil-square', 'nada' => 'warning'],
         'pengajuan_ditolak' => ['ikon' => 'x-circle', 'nada' => 'danger'],
         'nomor_dibatalkan' => ['ikon' => 'no-symbol', 'nada' => 'danger'],
+        'tanggal_realisasi_diubah' => ['ikon' => 'calendar-days', 'nada' => 'info'],
         // Legacy: the old Irban schedule revision (removed in Fase 9.2); kept so existing bell rows keep their icon.
         'revisi_jadwal_diajukan' => ['ikon' => 'calendar-days', 'nada' => 'info'],
         'revisi_jadwal_disetujui' => ['ikon' => 'calendar-days', 'nada' => 'success'],

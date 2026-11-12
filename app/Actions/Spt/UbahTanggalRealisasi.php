@@ -4,11 +4,16 @@ namespace App\Actions\Spt;
 
 use App\Actions\Spt\Concerns\MelaksanakanSpt;
 use App\Enums\KejadianSpt;
+use App\Models\Pegawai;
 use App\Models\Spt;
 use App\Models\User;
+use App\Notifications\TanggalRealisasiDiubah;
+use App\Services\PenerimaNotifikasi;
 use App\Support\DiinputOleh;
+use App\Support\Tanggal;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -47,8 +52,10 @@ class UbahTanggalRealisasi
             throw ValidationException::withMessages($e);
         }
 
-        $spt = DB::transaction(function () use ($user, $spt, $mulai, $selesai, $alasan, $diinput) {
+        $lamaTeks = null;
+        $spt = DB::transaction(function () use ($user, $spt, $mulai, $selesai, $alasan, $diinput, &$lamaTeks) {
             $spt = $this->kunci($user, $spt);
+            $lamaTeks = Tanggal::rentang($spt->tanggal_mulai, $spt->tanggal_selesai);
             $lama = ['tanggal_mulai' => $spt->tanggal_mulai?->toDateString(), 'tanggal_selesai' => $spt->tanggal_selesai?->toDateString()];
             $baru = ['tanggal_mulai' => $mulai->toDateString(), 'tanggal_selesai' => $selesai->toDateString()];
             if ($lama === $baru) {
@@ -63,6 +70,12 @@ class UbahTanggalRealisasi
             return $spt;
         });
         DiinputOleh::ingat($user, $diinput);
+
+        $penerima = app(PenerimaNotifikasi::class);
+        Notification::send(
+            $penerima->bagianUmum()->merge($penerima->pimpinan())->unique('id'),
+            new TanggalRealisasiDiubah($spt, $lamaTeks, Tanggal::rentang($mulai, $selesai), $alasan, Pegawai::find($diinput)?->nama_bergelar),
+        );
 
         return $spt;
     }

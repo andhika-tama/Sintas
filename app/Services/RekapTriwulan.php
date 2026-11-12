@@ -31,7 +31,7 @@ class RekapTriwulan
     public function hitung(int $tahun, ?int $irbanId = null): array
     {
         $irban = Irban::orderBy('id')->when($irbanId, fn ($q) => $q->whereKey($irbanId))->get(['id', 'nama', 'kode_nomor']);
-        $klasifikasi = Klasifikasi::orderBy('id')->get(['id', 'nama']);
+        $klasifikasi = Klasifikasi::urut()->get(['id', 'nama']);
         $jenis = JenisPenugasan::orderBy('nama')->get(['id', 'nama']);
 
         $rr = ['rencana' => 0, 'realisasi' => 0];

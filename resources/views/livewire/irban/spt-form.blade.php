@@ -83,7 +83,7 @@
                             <input type="radio" name="klasifikasi_id" value="{{ $k->id }}" wire:model.live="klasifikasi_id" @if ($loop->first) id="klasifikasi_id" @endif
                                 @if ($errors->has('klasifikasi_id')) aria-invalid="true" aria-describedby="klasifikasi_id-error" @endif
                                 class="size-5 border-border-strong text-mint-700 focus:ring-2 focus:ring-mint-600 focus:ring-offset-2">
-                            {{ $k->nama }}
+                            <span class="min-w-0 [overflow-wrap:anywhere]">{{ $k->label() }}</span>
                         </label>
                     @endforeach
                 </div>

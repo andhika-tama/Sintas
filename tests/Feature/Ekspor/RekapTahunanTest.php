@@ -147,6 +147,34 @@ class RekapTahunanTest extends TestCase
         }
     }
 
+    /**
+     * 1.2.1 Task 6: the legend follows urutan and holds the active klasifikasi plus the inactive ones the year's SPT use; with 6 of them
+     * every legend column has the legend width and the print area reaches the last one.
+     */
+    public function test_legenda_enam_klasifikasi_urutan_nonaktif_dan_area_cetak(): void
+    {
+        $this->data(); // 2025 uses REGULER, KHUSUS, DIKLAT, LAIN_LAIN, LUAR_DAERAH
+        $baru = fn (string $kode, array $o = []) => Klasifikasi::create($o + ['kode' => $kode, 'nama' => str_replace('_', ' ', $kode), 'syarat_selesai' => 'konfirmasi', 'urutan' => 6]);
+        $baru('EVALUASI', ['warna' => '332288', 'urutan' => 7]);
+        $baru('AUDIT_KINERJA', ['aktif' => false]); // inactive and unused: left out
+        Klasifikasi::where('kode', 'DIKLAT')->update(['aktif' => false]); // inactive but used in 2025: kept
+        Klasifikasi::where('kode', 'LAIN_LAIN')->update(['urutan' => 0]);
+
+        // A year without SPT: only the active ones.
+        $kosong = $this->buku(2031)->getSheetByName('MARET');
+        $this->assertSame(['LAIN-LAIN', 'REGULER', 'KHUSUS', 'LUAR DAERAH', 'EVALUASI', null], $kosong->rangeToArray('G2:L2')[0]);
+        $this->assertSame('A1:K3', $kosong->getPageSetup()->getPrintArea());
+
+        $jan = $this->buku()->getSheetByName('JANUARI'); // last, so SAMPLE_REKAP_TAHUNAN keeps the 6-klasifikasi 2025 workbook
+        $this->assertSame(['LAIN-LAIN', 'REGULER', 'KHUSUS', 'DIKLAT', 'LUAR DAERAH', 'EVALUASI', null], $jan->rangeToArray('G2:M2')[0]);
+        foreach (['G', 'H', 'I', 'J', 'K', 'L'] as $kolom) {
+            $this->assertEquals(14, $jan->getColumnDimension($kolom)->getWidth(), $kolom);
+        }
+        $this->assertSame('332288', $jan->getStyle('L2')->getFill()->getStartColor()->getRGB());
+        $this->assertSame('FFFFFF', $jan->getStyle('L2')->getFont()->getColor()->getRGB()); // dark colour: white text
+        $this->assertSame('A1:L8', $jan->getPageSetup()->getPrintArea());
+    }
+
     public function test_empty_year_still_has_twelve_sheets(): void
     {
         $buku = $this->buku(2031);

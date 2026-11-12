@@ -52,6 +52,13 @@ class CatatNomorManual
             'tanggal_selesai.after_or_equal' => 'Tanggal selesai tidak boleh sebelum tanggal mulai.',
             'alasan.required' => 'Alasan wajib diisi.', 'alasan.min' => 'Alasan minimal 10 karakter.', 'alasan.max' => 'Alasan maksimal 1000 karakter.',
         ]);
+        // A manual number is a new SPT: an inactive klasifikasi is refused (1.2.1 Task 6).
+        $v->after(function ($v) use ($data) {
+            $k = $v->errors()->has('klasifikasi_id') ? null : Klasifikasi::find($data['klasifikasi_id']);
+            if ($k && ! $k->aktif) {
+                $v->errors()->add('klasifikasi_id', "Klasifikasi {$k->nama} sudah nonaktif.");
+            }
+        });
         if ($v->fails() || $galatSppd) {
             throw ValidationException::withMessages($v->errors()->messages() + $galatSppd);
         }

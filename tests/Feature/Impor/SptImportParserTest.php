@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Impor;
 
+use App\Models\Klasifikasi;
 use App\Models\NomorCounter;
 use App\Models\PkptItem;
 use App\Models\Spt;
@@ -287,5 +288,14 @@ class SptImportParserTest extends TestCase
         $this->assertSame(['Nomor SPT 700/751/i/spt/2025 sudah ada.'], $this->pesan($r));
         [$r] = $this->analisis([$this->baris(['nomor_spt' => '700/752/I/SPT/2025'])]); // kontrol: nomor lain tidak bentrok
         $this->assertSame([], $this->pesan($r));
+    }
+
+    /** 1.2.1 Task 6: a deactivated klasifikasi cannot be imported for new SPT. */
+    public function test_klasifikasi_nonaktif_ditolak(): void
+    {
+        Klasifikasi::where('kode', 'DIKLAT')->update(['aktif' => false]);
+        [$r] = $this->analisis([$this->baris(['klasifikasi' => 'diklat'])]);
+        $this->assertSame('error', $r['status']);
+        $this->assertContains(['kolom' => 'klasifikasi', 'pesan' => 'Klasifikasi DIKLAT sudah nonaktif.'], $r['errors']);
     }
 }

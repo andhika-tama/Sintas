@@ -393,6 +393,34 @@ class SptFormTest extends TestCase
         $this->form($spt)->assertSet('kode_arsip_id', $k->id)->assertSee('800 · Kepegawaian', false);
     }
 
+    /** 1.2.1 Task 6: an inactive klasifikasi is not offered to a new SPT, and SimpanSpt refuses it. Options follow urutan. */
+    public function test_klasifikasi_nonaktif_tidak_ditawarkan_untuk_spt_baru(): void
+    {
+        Klasifikasi::where('kode', 'DIKLAT')->update(['aktif' => false]);
+        Klasifikasi::where('kode', 'LAIN_LAIN')->update(['urutan' => 0]);
+        $page = $this->form()->assertDontSee('DIKLAT')->assertSeeInOrder(['LAIN-LAIN', 'REGULER', 'KHUSUS', 'LUAR DAERAH']);
+
+        $page->set('diinput_oleh', $this->budi->id)->set('klasifikasi_id', $this->klas('DIKLAT'))->call('simpan')
+            ->assertHasErrors(['klasifikasi_id' => 'Klasifikasi DIKLAT sudah nonaktif.']);
+        $this->assertSame(0, Spt::count());
+    }
+
+    /** Review Focus 5: a draf whose klasifikasi was deactivated later keeps showing and saving it; another SPT still cannot pick it. */
+    public function test_draf_lama_berklasifikasi_nonaktif_tetap_tampil_dan_tersimpan(): void
+    {
+        $spt = Spt::factory()->create(['irban_id' => $this->irban->id, 'dibuat_oleh' => $this->user->id, 'klasifikasi_id' => $this->klas('DIKLAT'), 'pkpt_item_id' => null]);
+        Klasifikasi::where('kode', 'DIKLAT')->update(['aktif' => false]);
+
+        $this->form($spt)->assertSet('klasifikasi_id', $this->klas('DIKLAT'))->assertSee('DIKLAT (nonaktif)')
+            ->set('diinput_oleh', $this->budi->id)->set('uraian_untuk', 'Diubah')->call('simpan')->assertHasNoErrors();
+        $this->assertSame(['Diubah', $this->klas('DIKLAT')], [$spt->fresh()->uraian_untuk, $spt->fresh()->klasifikasi_id]);
+
+        $lain = Spt::factory()->create(['irban_id' => $this->irban->id, 'dibuat_oleh' => $this->user->id, 'klasifikasi_id' => $this->klas('KHUSUS')]);
+        $this->form($lain)->assertDontSee('DIKLAT')->set('diinput_oleh', $this->budi->id)->set('klasifikasi_id', $this->klas('DIKLAT'))->call('simpan')
+            ->assertHasErrors(['klasifikasi_id' => 'Klasifikasi DIKLAT sudah nonaktif.']);
+        $this->assertSame($this->klas('KHUSUS'), $lain->fresh()->klasifikasi_id);
+    }
+
     public function test_draf_saved_as_non_pkpt_reloads_checked(): void
     {
         $this->form()->set('diinput_oleh', $this->budi->id)->set('klasifikasi_id', $this->klas('KHUSUS'))

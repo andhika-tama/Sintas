@@ -50,9 +50,12 @@ class PembangunRekapTahunan implements Pembangun
 
     public function export(User $user, array $filter): Export
     {
-        $legenda = Klasifikasi::orderBy('id')->get()->map(fn ($k) => ['nama' => $k->nama, 'warna' => $k->warna])->all();
+        $baris = app(RegisterNomor::class)->query($filter)->get();
+        // Legend (1.2.1 Task 6): active klasifikasi plus the inactive ones this year's SPT use, in urutan order.
+        $legenda = Klasifikasi::urut()->where(fn ($q) => $q->aktif()->orWhereIn('id', $baris->pluck('klasifikasi_id')->unique()))->get()
+            ->map(fn ($k) => ['nama' => $k->nama, 'warna' => $k->warna])->all();
         $perBulan = array_fill(1, 12, []);
-        foreach (app(RegisterNomor::class)->query($filter)->get() as $spt) {
+        foreach ($baris as $spt) {
             // Every numbered SPT has tanggal_spt (set with the number); spt.tahun is its year, so the month alone picks the sheet.
             $perBulan[$spt->tanggal_spt->month][] = $this->blok($spt);
         }

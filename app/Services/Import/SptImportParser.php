@@ -242,6 +242,8 @@ class SptImportParser
         $klas = $l['klasifikasi'][mb_strtolower($r['klasifikasi'])] ?? null;
         if (! $klas) {
             $galat('klasifikasi', $r['klasifikasi'] === '' ? 'Klasifikasi wajib diisi.' : "Klasifikasi \"{$r['klasifikasi']}\" tidak ditemukan.");
+        } elseif (! $klas->aktif) {
+            $galat('klasifikasi', "Klasifikasi {$klas->nama} sudah nonaktif.");
         }
         $jenis = $r['jenis_penugasan'] === '' ? null : ($l['jenis'][mb_strtolower($r['jenis_penugasan'])] ?? null);
         if ($r['jenis_penugasan'] !== '' && ! $jenis) {

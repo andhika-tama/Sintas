@@ -2,7 +2,7 @@
 
 namespace Tests\Feature\Spt;
 
-use App\Actions\MasterData\UpdateKlasifikasi;
+use App\Actions\MasterData\SaveKlasifikasi;
 use App\Actions\Spt\SimpanKendala;
 use App\Actions\Spt\TandaiSelesai;
 use App\Actions\Spt\UbahTanggalRealisasi;
@@ -440,7 +440,7 @@ class PelaksanaanSptTest extends TestCase
         $spt = $this->spt('KHUSUS');
         $this->gagal(fn () => $this->selesai($spt), 'berkas');
 
-        app(UpdateKlasifikasi::class)->handle($khusus, ['wajibItemPkpt' => $khusus->wajib_item_pkpt, 'syaratSelesai' => 'konfirmasi', 'tampilPublik' => $khusus->tampil_publik]);
+        app(SaveKlasifikasi::class)->handle($khusus, ['nama' => $khusus->nama, 'wajibItemPkpt' => $khusus->wajib_item_pkpt, 'syaratSelesai' => 'konfirmasi', 'tampilPublik' => $khusus->tampil_publik]);
         $this->assertSame(SyaratSelesai::Konfirmasi, app(TandaiSelesai::class)->syarat($spt->fresh()));
         $this->gagal(fn () => $this->selesai($spt->fresh()), 'konfirmasi');
         $this->selesai($spt->fresh(), ['konfirmasi' => true]);

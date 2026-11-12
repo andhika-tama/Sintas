@@ -94,7 +94,7 @@ class RekapTriwulanTest extends TestCase
         $rekap = app(RekapTriwulan::class)->hitung(2026);
         $kl = $this->sel($rekap['klasifikasi']['baris']);
 
-        $this->assertSame(Klasifikasi::orderBy('id')->pluck('id')->all(), array_column($rekap['klasifikasi']['baris'], 'id'));
+        $this->assertSame(Klasifikasi::urut()->pluck('id')->all(), array_column($rekap['klasifikasi']['baris'], 'id'));
         $this->assertSame('REGULER', collect($rekap['klasifikasi']['baris'])->firstWhere('id', $this->r)['nama']);
         // REGULER: TW I s1(S)+s2(B); TW II s3(S)+s6(S); TW III s9(B); TW IV s5(S) → 6 = 2 berjalan + 4 selesai.
         $this->assertSame($this->kl([[2, 1, 1], [2, 0, 2], [1, 1, 0], [1, 0, 1]], [6, 2, 4]), $kl[$this->r]);
@@ -105,6 +105,15 @@ class RekapTriwulanTest extends TestCase
         }
         // Total: 2+0, 2+1, 1+0, 1+1 → 2,3,1,2 = 8 (3 berjalan, 5 selesai).
         $this->assertSame($this->kl([[2, 1, 1], [3, 0, 3], [1, 1, 0], [2, 1, 1]], [8, 3, 5]), $rekap['klasifikasi']['total']);
+    }
+
+    /** 1.2.1 Task 6: Per Klasifikasi follows urutan, not id. */
+    public function test_per_klasifikasi_mengikuti_urutan(): void
+    {
+        Klasifikasi::where('kode', 'LAIN_LAIN')->update(['urutan' => 0]);
+        Klasifikasi::where('kode', 'REGULER')->update(['urutan' => 9]);
+        $rekap = app(RekapTriwulan::class)->hitung(2026);
+        $this->assertSame(['LAIN-LAIN', 'KHUSUS', 'DIKLAT', 'LUAR DAERAH', 'REGULER'], array_column($rekap['klasifikasi']['baris'], 'nama'));
     }
 
     public function test_per_jenis_penugasan(): void

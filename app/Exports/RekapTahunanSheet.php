@@ -161,6 +161,8 @@ class RekapTahunanSheet extends DefaultValueBinder implements FromArray, WithCol
             $s->getPageSetup()->setRowsToRepeatAtTopByStartAndEnd($h, $h);
             $s->getPageSetup()->setOrientation(PageSetup::ORIENTATION_LANDSCAPE)->setPaperSize(PageSetup::PAPERSIZE_A4)->setFitToWidth(1)->setFitToHeight(0);
             $s->getPageSetup()->setFitToPage(true);
+            // Any number of legend columns (6–8 klasifikasi included) stays on the printed page.
+            $s->getPageSetup()->setPrintArea('A1:'.($this->legenda ? Coordinate::stringFromColumnIndex(6 + count($this->legenda)) : 'E').$akhir);
             $s->getPageMargins()->setTop(0.5)->setBottom(0.5)->setLeft(0.4)->setRight(0.4);
         }];
     }

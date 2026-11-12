@@ -271,6 +271,9 @@ class SimpanSpt
         $klasifikasi = Klasifikasi::find($this->int($d['klasifikasi_id'] ?? null));
         if (! $klasifikasi) {
             $e['klasifikasi_id'] = 'Pilih klasifikasi.';
+        } elseif (! $klasifikasi->aktif && $klasifikasi->id !== $spt?->klasifikasi_id) {
+            // A draf keeps the klasifikasi it already holds after it was deactivated (1.2.1 Task 6); nothing else may pick it.
+            $e['klasifikasi_id'] = "Klasifikasi {$klasifikasi->nama} sudah nonaktif.";
         }
         // K4: the Irban picks the kode arsip; required on submit, an unknown id counts as none.
         $kodeArsip = KodeArsip::find($this->int($d['kode_arsip_id'] ?? null))?->id;

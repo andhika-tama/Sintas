@@ -437,7 +437,8 @@ class SptForm extends Component
         return view('livewire.irban.spt-form', [
             'spt' => $spt,
             'dokumen' => $spt?->dokumen->firstWhere('jenis', 'draf'),
-            'klasifikasiList' => Klasifikasi::orderBy('id')->get(),
+            // Active ones, plus the draf's own klasifikasi when it was deactivated later (shown with "(nonaktif)").
+            'klasifikasiList' => Klasifikasi::urut()->where(fn ($q) => $q->aktif()->orWhere('id', $spt?->klasifikasi_id))->get(),
             'klasifikasi' => $this->klasifikasi(),
             'kodeArsipOptions' => KodeArsip::orderBy('kode')->get()->mapWithKeys(fn ($k) => [$k->id => $k->kode.' · '.$k->nama])->all(),
             'itemOptions' => $items->mapWithKeys(fn ($i) => [$i->id => $i->jenisPenugasan->nama.' · '.$rentang[$i->id]])->all(),

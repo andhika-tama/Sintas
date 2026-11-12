@@ -720,6 +720,7 @@ Lalu jalankan [pemeriksaan setelah deploy](#11-pemeriksaan-setelah-deploy) yang 
   ```
   Saring per kondisi bila pengingat untuk SPT tertentu tetap diinginkan. Instalasi baru tidak perlu.
 - **Impor SPT data lama.** Bila hasil impor memperingatkan `Nomor urut {n} melebihi nomor terakhir register {tahun}`, atur `Nomor awal` di Register untuk tahun berjalan sebelum menerbitkan nomor baru. Impor berjalan sinkron, maks 2000 baris dan 5 MB per berkas `.xlsx`, tanpa notifikasi.
+- **Versi 1.2.1 (klasifikasi).** `php artisan migrate --force` menjalankan `2026_12_21_000001_tambah_aktif_urutan_ke_klasifikasi`: menambah `klasifikasi.aktif` (bawaan aktif) dan `klasifikasi.urutan`, dan mengisi `urutan` baris yang ada (1..n menurut id) sehingga daftar tetap berurutan. Tidak ada langkah manual, aman dijalankan ulang; cadangkan dulu seperti biasa (langkah 1). Admin kini dapat menambah, menonaktifkan, dan menghapus klasifikasi (menu Klasifikasi & Aturan).
 - **Log aktivitas.** `activity_log` tidak boleh dihapus (PRD §7.12). `php artisan activitylog:clean` sengaja menolak dengan kode keluar 1. Jangan menghapus baris secara manual; pengarsipan dilakukan lewat cadangan.
 
 ## 14. Masalah umum

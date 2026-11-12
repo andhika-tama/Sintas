@@ -16,7 +16,7 @@ use Tests\TestCase;
 
 class HalamanImporTest extends TestCase
 {
-    use RefreshDatabase, SptImportTestHelpers;
+    use PeriksaUnduhanExcel, RefreshDatabase, SptImportTestHelpers;
 
     protected function setUp(): void
     {
@@ -94,6 +94,15 @@ class HalamanImporTest extends TestCase
         file_put_contents($path, base64_decode($c->effects['download']['content']));
         $this->assertSame([['Baris', 'Kolom', 'Pesan'], ['5', 'irban', 'Irban "Irban IX" tidak ditemukan.']],
             array_map(fn ($r) => array_map('strval', $r), IOFactory::load($path)->getActiveSheet()->toArray()));
+    }
+
+    public function test_templat_dan_galat_berlebar_dan_berheader_mint(): void
+    {
+        $s = $this->bacaUnduhan(Livewire::actingAs($this->admin)->test(Page::class)->call('unduhTemplat'));
+        $this->periksaHeaderMint($s, count(SptImportParser::HEADERS));
+        $this->periksaLebar($s, ['A' => 11, 'B' => 13, 'F' => 40, 'G' => 40, 'H' => 40, 'M' => 40, 'R' => 40]);
+
+        $this->periksaBerkasGalat($this->bacaUnduhan($this->unggah($this->campuran())->call('unduhGalat')));
     }
 
     public function test_raw_dirusak_lebih_dari_maks(): void

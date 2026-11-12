@@ -14,11 +14,12 @@ use Livewire\Livewire;
 use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use Tests\Feature\Impor\PeriksaUnduhanExcel;
 use Tests\TestCase;
 
 class PegawaiImporTest extends TestCase
 {
-    use RefreshDatabase;
+    use PeriksaUnduhanExcel, RefreshDatabase;
 
     private const H = ['nama_bergelar', 'nip', 'pangkat', 'golongan', 'jabatan', 'aktif'];
 
@@ -158,6 +159,17 @@ class PegawaiImporTest extends TestCase
         $path = $this->xlsx([['Bad', '1', '', '', '', '']]);
         Livewire::actingAs($admin)->test(Page::class)->set('file', $this->upload($path))
             ->call('unduhGalat')->assertFileDownloaded('galat-impor-pegawai.xlsx');
+    }
+
+    public function test_templat_dan_galat_berlebar_dan_berheader_mint(): void
+    {
+        $admin = User::factory()->admin()->create();
+        $s = $this->bacaUnduhan(Livewire::actingAs($admin)->test(Page::class)->call('unduhTemplat'));
+        $this->periksaHeaderMint($s, count(PegawaiImportParser::HEADERS));
+        $this->periksaLebar($s, ['A' => 30, 'B' => 22, 'C' => 20, 'D' => 10, 'E' => 30, 'F' => 28, 'G' => 7]);
+
+        $c = Livewire::actingAs($admin)->test(Page::class)->set('file', $this->upload($this->xlsx([['Bad', '1', '', '', '', '']])))->call('unduhGalat');
+        $this->periksaBerkasGalat($this->bacaUnduhan($c));
     }
 
     public function test_non_admin_forbidden(): void

@@ -17,11 +17,12 @@ use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use Tests\Feature\Impor\PeriksaUnduhanExcel;
 use Tests\TestCase;
 
 class PkptImporTest extends TestCase
 {
-    use RefreshDatabase;
+    use PeriksaUnduhanExcel, RefreshDatabase;
 
     private Pkpt $pkpt;
 
@@ -199,6 +200,18 @@ class PkptImporTest extends TestCase
         Livewire::actingAs($admin)->test(Page::class, ['pkpt' => $this->pkpt])
             ->set('file', $this->upload($this->xlsx([$this->row([0 => 'zzz'])])))
             ->call('unduhGalat')->assertFileDownloaded('galat-impor-pkpt.xlsx');
+    }
+
+    public function test_templat_dan_galat_berlebar_dan_berheader_mint(): void
+    {
+        $admin = User::factory()->admin()->create();
+        $s = $this->bacaUnduhan(Livewire::actingAs($admin)->test(Page::class, ['pkpt' => $this->pkpt])->call('unduhTemplat'));
+        $this->periksaHeaderMint($s, count(PkptItemImportParser::HEADERS));
+        $this->periksaLebar($s, ['A' => 7, 'B' => 17, 'C' => 15, 'D' => 17, 'E' => 40, 'F' => 12]);
+
+        $c = Livewire::actingAs($admin)->test(Page::class, ['pkpt' => $this->pkpt])
+            ->set('file', $this->upload($this->xlsx([$this->row([0 => 'zzz'])])))->call('unduhGalat');
+        $this->periksaBerkasGalat($this->bacaUnduhan($c));
     }
 
     public function test_non_admin_forbidden(): void

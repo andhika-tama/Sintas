@@ -30,6 +30,8 @@ use App\Models\Spt;
 use App\Models\User;
 use App\Services\Ekspor;
 use App\Services\Ekspor\PembangunRekap;
+use App\Services\RealisasiItemPkpt;
+use App\Services\RekapTriwulan;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Notifications\DatabaseNotification;
@@ -156,7 +158,9 @@ class OtorisasiAksiTest extends TestCase
     {
         Queue::fake();
         // Force the queued path so the stored filter can be read back.
-        $this->partialMock(PembangunRekap::class, fn ($m) => $m->shouldReceive('jumlah')->andReturn(Ekspor::BATAS_LANGSUNG + 1));
+        // Real constructor deps: the Rekap view calls tanpaTarget(), which needs $this->rekap.
+        $this->instance(PembangunRekap::class, \Mockery::mock(PembangunRekap::class, [app(RekapTriwulan::class), app(RealisasiItemPkpt::class)])
+            ->makePartial()->shouldReceive('jumlah')->andReturn(Ekspor::BATAS_LANGSUNG + 1)->getMock());
 
         $c = Livewire::actingAs($this->irban)->test(Rekap::class)->set('irban', (string) $this->irbanLain->irban_id)
             ->call('bukaEkspor', 'xlsx')->call('unduhEkspor');

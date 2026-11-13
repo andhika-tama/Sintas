@@ -27,7 +27,7 @@ class MonitoringSpt
     /**
      * Validated filter; unknown or malformed values fall back to the default (tahun = current Jakarta year, others null).
      *
-     * @return array{tahun: int, tw: ?int, irban: ?int, status: ?string, jenis: ?int, kesesuaian: ?string, penanda: ?string, penjelasan: ?string, cari: ?string}
+     * @return array{tahun: int, tw: ?int, irban: ?int, status: ?string, klasifikasi: ?int, kode_arsip: ?int, jenis: int|string|null, kesesuaian: ?string, penanda: ?string, penjelasan: ?string, cari: ?string}
      */
     public function filter(array $input): array
     {
@@ -36,14 +36,16 @@ class MonitoringSpt
         $tahun = $int($input['tahun'] ?? null);
         $tw = $int($input['tw'] ?? null);
         $irban = $int($input['irban'] ?? null);
-        $jenis = $int($input['jenis'] ?? null);
+        $saring = app(SaringSpt::class)->dari($input);
 
         return [
             'tahun' => $tahun !== null && $tahun >= 2000 && $tahun <= 2100 ? $tahun : (int) now('Asia/Jakarta')->year,
             'tw' => $tw !== null && $tw >= 1 && $tw <= 4 ? $tw : null,
             'irban' => $irban && Irban::whereKey($irban)->exists() ? $irban : null,
             'status' => $pilih($input['status'] ?? null, self::STATUS),
-            'jenis' => $jenis && JenisPenugasan::whereKey($jenis)->exists() ? $jenis : null,
+            'klasifikasi' => $saring['klasifikasi'],
+            'kode_arsip' => $saring['kode_arsip'],
+            'jenis' => $saring['jenis'],
             'kesesuaian' => $pilih($input['kesesuaian'] ?? null, self::KESESUAIAN),
             'penanda' => $pilih($input['penanda'] ?? null, ['terlambat']),
             'penjelasan' => $pilih($input['penjelasan'] ?? null, ['terbuka']),
@@ -123,7 +125,7 @@ class MonitoringSpt
             // ESCAPE '!' instead of backslash: SQLite has no default escape character, MySQL has, and '!' works on both.
             ->when($f['cari'] !== null, fn ($q) => $q->whereRaw("nomor_lengkap LIKE ? ESCAPE '!'", ['%'.preg_replace('/[!%_]/', '!$0', $f['cari']).'%']))
             ->when($f['irban'], fn ($q, $id) => $q->where('irban_id', $id))
-            ->when($f['jenis'], fn ($q, $id) => $q->where('jenis_penugasan_id', $id))
+            ->saring($f)
             ->when($f['kesesuaian'] === 'non_pkpt', fn ($q) => $q->whereNull('pkpt_item_id'))
             ->when($f['penjelasan'], fn ($q) => $q->whereHas('komentar', fn ($k) => $k->permintaanTerbuka()))
             ->when($f['status'], fn ($q, $s) => $s === 'berjalan' ? $q->whereNull('ditandai_selesai_pada') : $q->berstatus(StatusSpt::from($s)))

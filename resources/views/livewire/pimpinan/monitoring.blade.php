@@ -55,7 +55,7 @@
     </x-ui.drawer>
 
     <div wire:loading.delay.class="opacity-60" wire:loading.delay.attr="aria-busy"
-        wire:target="cari,tampilan,urut,tahun,tw,irban,status,jenis,kesesuaian,penanda,penjelasan,aturUlang,gotoPage,previousPage,nextPage">
+        wire:target="cari,tampilan,urut,tahun,tw,irban,status,klasifikasi,kode_arsip,jenis,kesesuaian,penanda,penjelasan,aturUlang,gotoPage,previousPage,nextPage">
         <div class="mb-3 flex flex-wrap items-end gap-3">
             <x-ui.segmented name="tampilan" legend="Tampilan Monitoring" wire:model.live="tampilan" :value="$this->tampilan"
                 :options="['pkpt' => 'Per PKPT', 'spt' => 'Per SPT']" :icons="['pkpt' => 'heroicon-m-rectangle-group', 'spt' => 'heroicon-m-list-bullet']" />

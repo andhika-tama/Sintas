@@ -10,6 +10,7 @@ use App\Enums\StatusPengajuan;
 use App\Enums\SumberSpt;
 use App\Exports\RegisterSheet;
 use App\Livewire\BagianUmum\Register;
+use App\Models\Ekspor;
 use App\Models\Irban;
 use App\Models\JenisPenugasan;
 use App\Models\Klasifikasi;
@@ -20,6 +21,7 @@ use App\Models\Pegawai;
 use App\Models\PkptItem;
 use App\Models\Spt;
 use App\Models\User;
+use App\Services\Ekspor\PembangunRekapTahunan;
 use App\Services\RegisterNomor;
 use App\Services\Settings;
 use App\Support\Navigation;
@@ -27,9 +29,11 @@ use Carbon\CarbonImmutable;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
 use Maatwebsite\Excel\Facades\Excel;
+use PhpOffice\PhpSpreadsheet\IOFactory;
 use Tests\TestCase;
 
 /** Register Nomor SPT, catat nomor manual, batalkan nomor, nomor awal, ekspor (design/dashboard/bagian-umum.md "Register"). */
@@ -358,6 +362,85 @@ class RegisterTest extends TestCase
             $this->assertSame(RegisterNomor::KOLOM, $e->array()[3]);
             $this->assertCount(5, $e->array());
             $this->assertSame([$b->nomor_lengkap, 'Dua', 'Dibatalkan', 'Dibatalkan: Salah ketik perihal SPT'], array_values(array_intersect_key($e->array()[4], array_flip([0, 10, 13, 15]))));
+
+            return true;
+        });
+    }
+
+    /** 1.3 Task 1: Klasifikasi, Kode Arsip and Jenis (incl. Lainnya) filter the table, both exports and the queued export; Rekap Tahunan ignores them. */
+    public function test_klasifikasi_kode_arsip_and_jenis_filters(): void
+    {
+        Storage::fake('local');
+        $reguler = Klasifikasi::where('kode', 'REGULER')->firstOrFail();
+        $k800 = KodeArsip::firstOrCreate(['kode' => '800'], ['nama' => 'Kepegawaian']);
+        $a = $this->terbit('Satu');
+        $b = $this->terbit('Dua');
+        $c = $this->terbit('Tiga');
+        $a->forceFill(['klasifikasi_id' => $reguler->id])->save();
+        $b->forceFill(['kode_arsip_id' => $k800->id])->save();
+        $c->forceFill(['jenis_penugasan_id' => null, 'jenis_penugasan_lainnya' => 'Evaluasi khusus'])->save();
+        $svc = app(RegisterNomor::class);
+        $ids = fn (array $f) => $svc->query(['tahun' => 2026] + $f)->pluck('id')->all();
+
+        $this->assertSame([$a->id], $ids(['klasifikasi' => (string) $reguler->id]));
+        $this->assertSame([$b->id], $ids(['kode_arsip' => $k800->id]));
+        $this->assertSame([$c->id], $ids(['jenis' => 'lainnya']));
+        $this->assertCount(3, $ids(['klasifikasi' => '999999', 'kode_arsip' => 'x', 'jenis' => 'bukan'])); // fictitious values are ignored
+        $this->assertSame(['Klasifikasi: '.$reguler->nama, 'Kode Arsip: 800 · Kepegawaian', 'Jenis: Lainnya'],
+            $svc->ringkasanFilter(['tahun' => 2026, 'klasifikasi' => $reguler->id, 'kode_arsip' => $k800->id, 'jenis' => 'lainnya']));
+
+        // Page: URL properties, table, reset.
+        Livewire::withQueryParams(['klasifikasi' => (string) $reguler->id])->actingAs($this->bu)->test(Register::class)
+            ->assertSet('klasifikasi', (string) $reguler->id)->assertSee($a->nomor_lengkap)->assertDontSee($b->nomor_lengkap)
+            ->set('klasifikasi', '')->set('jenis', 'lainnya')->assertSee($c->nomor_lengkap)->assertDontSee($a->nomor_lengkap)
+            ->set('kode_arsip', (string) $k800->id)->assertSee('Tidak ada nomor yang cocok.')
+            ->call('aturUlang')->assertSet('jenis', '')->assertSet('kode_arsip', '')->assertSee($a->nomor_lengkap)->assertSee($c->nomor_lengkap);
+
+        // Excel + PDF follow the filter (query params of the previous page test would linger otherwise).
+        Livewire::withQueryParams([]);
+        Excel::fake();
+        $this->register()->set('jenis', 'lainnya')->call('ekspor', 'xlsx');
+        Excel::assertDownloaded('register-nomor-spt-2026.xlsx', function (RegisterSheet $e) use ($c) {
+            $this->assertCount(5, $e->array());
+            $this->assertSame($c->nomor_lengkap, $e->array()[4][0]);
+            $this->assertStringContainsString('Jenis: Lainnya', json_encode($e->array()[1]));
+
+            return true;
+        });
+        $html = $svc->html(['tahun' => 2026, 'kode_arsip' => $k800->id]);
+        $this->assertStringContainsString('Kode Arsip: 800 · Kepegawaian', $html);
+        $this->assertStringContainsString($b->nomor_lengkap, $html);
+        $this->assertStringNotContainsString($a->nomor_lengkap, $html);
+    }
+
+    public function test_queued_export_rebuilds_the_new_filters(): void
+    {
+        Storage::fake('local');
+        $this->terbit('Satu');
+        $b = $this->terbit('Dua');
+        $b->forceFill(['jenis_penugasan_id' => null, 'jenis_penugasan_lainnya' => 'Evaluasi khusus'])->save();
+        // The stored filter is rebuilt by PembangunRegister::filter(), so the keys survive and are re-validated.
+        foreach ([[['tahun' => 2026, 'jenis' => 'lainnya'], 1], [['tahun' => 2026, 'jenis' => 'bukan', 'klasifikasi' => '999999'], 2]] as [$simpan, $jumlah]) {
+            $e = Ekspor::create(['user_id' => $this->bu->id, 'jenis' => 'register', 'format' => 'xlsx', 'filter' => $simpan, 'nama_file' => 'r.xlsx', 'status' => 'menunggu']);
+            app(\App\Services\Ekspor::class)->tulis($e);
+            $sheet = IOFactory::load(Storage::disk('local')->path($e->fresh()->path))->getActiveSheet();
+            $this->assertSame($jumlah, $sheet->getHighestRow() - 4);
+        }
+    }
+
+    public function test_rekap_tahunan_ignores_the_new_filters(): void
+    {
+        $a = $this->terbit('Satu');
+        $this->terbit('Dua');
+        $reguler = Klasifikasi::where('kode', 'REGULER')->firstOrFail();
+        $a->forceFill(['klasifikasi_id' => $reguler->id])->save();
+        $p = app(PembangunRekapTahunan::class);
+
+        $this->assertSame(['tahun' => 2026], $p->filter($this->bu, ['tahun' => 2026, 'klasifikasi' => $reguler->id, 'kode_arsip' => 1, 'jenis' => 'lainnya']));
+        Excel::fake();
+        Livewire::withQueryParams(['klasifikasi' => (string) $reguler->id, 'jenis' => 'lainnya'])->actingAs($this->bu)->test(Register::class)->call('eksporRekapTahunan');
+        Excel::assertDownloaded('rekap-tahunan-spt-2026.xlsx', function ($e) {
+            $this->assertCount(2 + 2 * 2, $e->sheets()[9]->array()); // October holds both numbers despite the filters
 
             return true;
         });

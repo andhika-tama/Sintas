@@ -4,14 +4,19 @@ namespace Tests\Feature\Ekspor;
 
 use App\Enums\Role;
 use App\Exports\RekapSheet;
+use App\Models\Ekspor as EksporModel;
 use App\Models\Irban;
 use App\Models\JenisPenugasan;
+use App\Models\Klasifikasi;
+use App\Models\KodeArsip;
 use App\Models\Spt;
 use App\Models\User;
+use App\Services\Ekspor;
 use App\Services\Ekspor\PembangunMonitoring;
 use App\Services\MonitoringSpt;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Storage;
 use Maatwebsite\Excel\Facades\Excel;
 use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\IOFactory;
@@ -99,5 +104,37 @@ class MonitoringSheetTest extends TestCase
 
         $this->assertStringContainsString('Kesesuaian: Sesuai', $s->getCell('A2')->getValue());
         $this->assertSame('Nomor SPT', $s->getCell('A4')->getValue()); // empty result still has the header
+    }
+
+    /** 1.3 Task 1: the three new filters narrow the rows and are named in the Excel summary, the PDF header and the queued export. */
+    public function test_klasifikasi_kode_arsip_and_jenis_filters_reach_every_export(): void
+    {
+        Storage::fake('local');
+        $reguler = Klasifikasi::where('kode', 'REGULER')->firstOrFail();
+        $k800 = KodeArsip::firstOrCreate(['kode' => '800'], ['nama' => 'Kepegawaian']);
+        $a = Spt::factory()->diterima()->create(['klasifikasi_id' => $reguler->id, 'kode_arsip_id' => $k800->id, 'jenis_penugasan_id' => null, 'jenis_penugasan_lainnya' => 'Evaluasi khusus', 'tanggal_mulai' => '2026-03-05', 'tanggal_selesai' => '2026-03-20']);
+        $b = Spt::factory()->diterima()->create(['tanggal_mulai' => '2026-03-05', 'tanggal_selesai' => '2026-03-20']);
+        $f = ['tahun' => 2026, 'klasifikasi' => (string) $reguler->id, 'kode_arsip' => (string) $k800->id, 'jenis' => 'lainnya'];
+        $p = new PembangunMonitoring(app(MonitoringSpt::class));
+        $ringkasan = ['Klasifikasi: '.$reguler->nama, 'Kode Arsip: 800 · Kepegawaian', 'Jenis: Lainnya'];
+
+        $teks = $this->baca($f)->getCell('A2')->getValue();
+        foreach ($ringkasan as $baris) {
+            $this->assertStringContainsString($baris, $teks);
+        }
+        $html = $p->html($this->pimpinan, $p->filter($this->pimpinan, $f));
+        $this->assertStringContainsString(implode('; ', $ringkasan), $html);
+        $this->assertStringContainsString($a->nomor_lengkap, $html);
+        $this->assertStringNotContainsString($b->nomor_lengkap, $html);
+        $this->assertSame(1, $p->jumlah($this->pimpinan, $p->filter($this->pimpinan, $f)));
+
+        // Queued export: the stored filter is rebuilt through filter(), so the new keys must survive and be re-validated (a bogus id is dropped).
+        foreach ([[$f, 1], [['tahun' => 2026, 'klasifikasi' => '999999', 'kode_arsip' => 'x', 'jenis' => 'bukan'], 2]] as [$simpan, $baris]) {
+            $e = EksporModel::create(['user_id' => $this->pimpinan->id, 'jenis' => 'monitoring', 'format' => 'xlsx', 'filter' => $simpan, 'nama_file' => 'm.xlsx', 'status' => 'menunggu']);
+            app(Ekspor::class)->tulis($e);
+            $sheet = IOFactory::load(Storage::disk('local')->path($e->fresh()->path))->getActiveSheet();
+            $this->assertSame($baris === 1, str_contains((string) $sheet->getCell('A2')->getValue(), 'Klasifikasi: '));
+            $this->assertSame($baris, count(array_filter($sheet->toArray(null, true, false), fn ($r) => in_array($a->nomor_lengkap, $r, true) || in_array($b->nomor_lengkap, $r, true))));
+        }
     }
 }

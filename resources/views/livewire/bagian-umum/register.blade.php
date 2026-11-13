@@ -3,9 +3,8 @@
      own container; long text clamped with "Selengkapnya", team shown as "Nama (Peran) + N lainnya". Search by number, filters status pengajuan/irban/bulan,
      100 per page, export split button. Cancelled rows keep the Dibatalkan badge, text never struck through. No animation (DESIGN §7.5). --}}
 @php
-    $filterAktif = count(array_filter([$this->status, $this->irban, $this->bulan, $this->cari]));
+    $filterAktif = count(array_filter([$this->status, $this->irban, $this->bulan, $this->cari, $this->klasifikasi, $this->kode_arsip, $this->jenis], fn ($v) => $v !== '' && $v !== null));
     $total = $baris->total();
-    $atur = fn () => '$set(\'cari\', \'\'); $set(\'status\', \'\'); $set(\'irban\', \'\'); $set(\'bulan\', \'\')';
 @endphp
 <div>
     <x-ui.page-header title="Register Nomor SPT" title-id="judul-register" description="Stambook digital nomor SPT tahun {{ $this->tahun }}. Nomor yang dibatalkan tetap tercatat dan tidak dipakai ulang.">
@@ -42,19 +41,22 @@
             <div class="md:w-44"><x-ui.select label="Status" name="status" wire:model.live="status" :options="$statusOptions" placeholder="Semua status" :value="$this->status" /></div>
             <div class="md:w-44"><x-ui.select label="Irban" name="irban" wire:model.live="irban" :options="$irbanOptions" placeholder="Semua irban" :value="$this->irban" /></div>
             <div class="md:w-40"><x-ui.select label="Bulan" name="bulan" wire:model.live="bulan" :options="$bulanOptions" placeholder="Semua bulan" :value="$this->bulan" /></div>
+            <div class="md:w-52"><x-ui.select label="Klasifikasi" name="klasifikasi" wire:model.live="klasifikasi" :options="$saringOpsi['klasifikasi']" placeholder="Semua klasifikasi" :value="$this->klasifikasi" /></div>
+            <div class="md:w-56"><x-ui.select label="Kode Arsip" name="kode_arsip" wire:model.live="kode_arsip" :options="$saringOpsi['kode_arsip']" placeholder="Semua kode arsip" :value="$this->kode_arsip" /></div>
+            <div class="md:w-44"><x-ui.select label="Jenis" name="jenis" wire:model.live="jenis" :options="$saringOpsi['jenis']" placeholder="Semua jenis" :value="$this->jenis" /></div>
             @if ($filterAktif)
-                <x-ui.button type="button" variant="ghost" wire:click="{{ $atur() }}">Atur ulang</x-ui.button>
+                <x-ui.button type="button" variant="ghost" wire:click="aturUlang">Atur ulang</x-ui.button>
             @endif
         </div>
     </div>
 
-    <div wire:loading.delay.class="opacity-60" wire:target="tahun,cari,status,irban,bulan,gotoPage,previousPage,nextPage,perPage" wire:loading.delay.attr="aria-busy">
+    <div wire:loading.delay.class="opacity-60" wire:target="tahun,cari,status,irban,bulan,klasifikasi,kode_arsip,jenis,aturUlang,gotoPage,previousPage,nextPage,perPage" wire:loading.delay.attr="aria-busy">
         @if ($total === 0)
             <x-ui.card>
                 <x-ui.empty-state icon="book-open" :title="$filterAktif ? 'Tidak ada nomor yang cocok.' : 'Belum ada nomor terbit pada '.$this->tahun.'.'"
                     :description="$filterAktif ? 'Coba atur ulang filter.' : 'Nomor yang diterbitkan dari Kotak Masuk atau dicatat manual akan tampil di sini.'">
                     @if ($filterAktif)
-                        <x-ui.button type="button" variant="secondary" wire:click="{{ $atur() }}">Atur ulang filter</x-ui.button>
+                        <x-ui.button type="button" variant="secondary" wire:click="aturUlang">Atur ulang filter</x-ui.button>
                     @endif
                 </x-ui.empty-state>
             </x-ui.card>

@@ -6,6 +6,8 @@ use App\Enums\PeranTim;
 use App\Enums\StatusSpt;
 use App\Models\Irban;
 use App\Models\JenisPenugasan;
+use App\Models\Klasifikasi;
+use App\Models\KodeArsip;
 use App\Models\Komentar;
 use App\Models\Pegawai;
 use App\Models\PkptItem;
@@ -197,21 +199,43 @@ class MonitoringSptTest extends TestCase
         $this->assertSame(2, app(MonitoringSpt::class)->jumlah(['penanda' => 'terlambat', 'tw' => 2, 'tahun' => 2025])); // the chip ignores the selected year, as before
     }
 
+    /** 1.3 Task 1: Klasifikasi, Kode Arsip and Jenis (incl. Lainnya) narrow baris/daftar/jumlah alike. */
+    public function test_klasifikasi_kode_arsip_and_jenis_lainnya_filters(): void
+    {
+        $reguler = Klasifikasi::where('kode', 'REGULER')->value('id');
+        $k800 = KodeArsip::firstOrCreate(['kode' => '800'], ['nama' => 'Kepegawaian'])->id;
+        Spt::whereKey($this->m[1]->id)->update(['klasifikasi_id' => $reguler]);
+        Spt::whereKey($this->m[2]->id)->update(['kode_arsip_id' => $k800]);
+        Spt::whereKey($this->m[6]->id)->update(['jenis_penugasan_id' => null, 'jenis_penugasan_lainnya' => 'Evaluasi khusus']);
+        $monitoring = app(MonitoringSpt::class);
+        $ids = fn (array $f) => array_map(fn ($r) => $r['id'], $monitoring->daftar($monitoring->filter($f)));
+
+        $this->assertSame([$this->m[1]->id], $ids(['klasifikasi' => (string) $reguler]));
+        $this->assertSame([$this->m[2]->id], $ids(['kode_arsip' => $k800]));
+        $this->assertSame([$this->m[6]->id], $ids(['jenis' => 'lainnya']));
+        $this->assertSame(['i1' => [1]], $this->ringkas(['klasifikasi' => $reguler]));
+        $this->assertSame(1, $monitoring->jumlah($monitoring->filter(['kode_arsip' => $k800])));
+        $this->assertSame(1, $monitoring->jumlah($monitoring->filter(['jenis' => 'lainnya'])));
+        // Fictitious ids are ignored, not an error: the unfiltered list comes back.
+        $this->assertCount(6, $ids(['klasifikasi' => '999999', 'kode_arsip' => '999999', 'jenis' => 'lainnya-x']));
+        $this->assertSame([$this->m[6]->id], $ids(['jenis' => 'lainnya', 'klasifikasi' => '999999']));
+    }
+
     public function test_invalid_filter_values_fall_back(): void
     {
         $monitoring = app(MonitoringSpt::class);
-        $bawaan = ['tahun' => 2026, 'tw' => null, 'irban' => null, 'status' => null, 'jenis' => null, 'kesesuaian' => null, 'penanda' => null, 'penjelasan' => null, 'cari' => null];
+        $bawaan = ['tahun' => 2026, 'tw' => null, 'irban' => null, 'status' => null, 'klasifikasi' => null, 'kode_arsip' => null, 'jenis' => null, 'kesesuaian' => null, 'penanda' => null, 'penjelasan' => null, 'cari' => null];
         $this->assertSame($bawaan, $monitoring->filter([]));
 
         $invalid = ['tahun' => 'abc', 'tw' => 5, 'irban' => 99999, 'status' => 'draf', 'jenis' => 'x', 'kesesuaian' => 'foo', 'penanda' => 'non_pkpt', 'penjelasan' => 'ya', 'lain' => 1];
         $this->assertSame($bawaan, $monitoring->filter($invalid));
         $this->assertSame(['i1' => [1, 2], 'i3' => [4], 'i2' => [3], 'luar' => [5, 6]], $this->ringkas($invalid));
-        $this->assertSame(['tahun' => 2026, 'tw' => null, 'irban' => null, 'status' => null, 'jenis' => null, 'kesesuaian' => null, 'penanda' => null, 'penjelasan' => null, 'cari' => null],
+        $this->assertSame(['tahun' => 2026, 'tw' => null, 'irban' => null, 'status' => null, 'klasifikasi' => null, 'kode_arsip' => null, 'jenis' => null, 'kesesuaian' => null, 'penanda' => null, 'penjelasan' => null, 'cari' => null],
             $monitoring->filter(['tahun' => ['2025'], 'tw' => '0', 'status' => ['selesai']]));
 
         $valid = $monitoring->filter(['tahun' => '2025', 'tw' => '3', 'irban' => (string) $this->b->id, 'status' => 'selesai', 'jenis' => (string) $this->j1->id,
             'kesesuaian' => 'non_pkpt', 'penanda' => 'terlambat', 'penjelasan' => 'terbuka']);
-        $this->assertSame(['tahun' => 2025, 'tw' => 3, 'irban' => $this->b->id, 'status' => 'selesai', 'jenis' => $this->j1->id,
+        $this->assertSame(['tahun' => 2025, 'tw' => 3, 'irban' => $this->b->id, 'status' => 'selesai', 'klasifikasi' => null, 'kode_arsip' => null, 'jenis' => $this->j1->id,
             'kesesuaian' => 'non_pkpt', 'penanda' => 'terlambat', 'penjelasan' => 'terbuka', 'cari' => null], $valid);
     }
 

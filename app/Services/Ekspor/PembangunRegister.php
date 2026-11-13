@@ -6,6 +6,7 @@ use App\Exports\RegisterSheet;
 use App\Models\Spt;
 use App\Models\User;
 use App\Services\RegisterNomor;
+use App\Services\SaringSpt;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Gate;
 use Maatwebsite\Excel\Concerns\Export;
@@ -25,7 +26,7 @@ class PembangunRegister implements Pembangun
             'tahun' => $tahun >= 2000 ? $tahun : CarbonImmutable::now('Asia/Jakarta')->year,
             'cari' => (string) ($filter['cari'] ?? ''), 'status' => (string) ($filter['status'] ?? ''),
             'irban' => (string) ($filter['irban'] ?? ''), 'bulan' => (string) ($filter['bulan'] ?? ''),
-        ];
+        ] + app(SaringSpt::class)->dari($filter);
     }
 
     public function jumlah(User $user, array $filter): int

@@ -5,9 +5,9 @@ namespace App\Livewire\Pimpinan;
 use App\Enums\StatusPengajuan;
 use App\Livewire\Concerns\MintaEkspor;
 use App\Models\Irban;
-use App\Models\JenisPenugasan;
 use App\Models\Spt;
 use App\Services\MonitoringSpt;
+use App\Services\SaringSpt;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Title;
@@ -26,7 +26,7 @@ class Monitoring extends Component
 
     public const GRUP_PER_HALAMAN = 20;
 
-    private const FILTER = ['cari', 'tahun', 'tw', 'irban', 'status', 'jenis', 'kesesuaian', 'penanda', 'penjelasan'];
+    private const FILTER = ['cari', 'tahun', 'tw', 'irban', 'status', 'klasifikasi', 'kode_arsip', 'jenis', 'kesesuaian', 'penanda', 'penjelasan'];
 
     #[Url]
     public string $cari = '';
@@ -50,6 +50,13 @@ class Monitoring extends Component
     #[Url]
     public string $status = '';
 
+    #[Url]
+    public string $klasifikasi = '';
+
+    #[Url]
+    public string $kode_arsip = '';
+
+    /** Master jenis id or 'lainnya'. */
     #[Url]
     public string $jenis = '';
 
@@ -129,7 +136,7 @@ class Monitoring extends Component
             'kunci' => md5(json_encode($f)),
             'tahunList' => $tahunList,
             'irbanOptions' => Irban::orderBy('nama')->pluck('nama', 'id')->all(),
-            'jenisOptions' => JenisPenugasan::orderBy('nama')->pluck('nama', 'id')->all(),
+            'saringOpsi' => app(SaringSpt::class)->opsi(),
         ]);
     }
 }

@@ -24,7 +24,7 @@ class RegisterNomor
     /** Empty cell text (manual numbers leave most columns empty). */
     public const KOSONG = '–';
 
-    /** @param array{tahun: int, cari?: string, status?: string, irban?: int|string, bulan?: int|string} $f */
+    /** @param array{tahun: int, cari?: string, status?: string, irban?: int|string, bulan?: int|string, klasifikasi?: int|string|null, kode_arsip?: int|string|null, jenis?: int|string|null} $f */
     public function query(array $f): Builder
     {
         $status = $this->status($f);
@@ -39,6 +39,7 @@ class RegisterNomor
             ->when($status, fn ($q) => $q->where('status_pengajuan', $status))
             ->when($irban, fn ($q) => $q->where('irban_id', $irban))
             ->when($bulan, fn ($q) => $q->whereMonth('tanggal_spt', $bulan))
+            ->saring(app(SaringSpt::class)->dari($f))
             ->orderBy('nomor_urut')->orderBy('irban_id')->orderBy('id');
     }
 
@@ -111,6 +112,7 @@ class RegisterNomor
             ($s = $this->status($f)) ? 'Status: '.$s->label() : null,
             $irban ? 'Irban: '.Irban::whereKey($irban)->value('nama') : null,
             $bulan ? 'Bulan: '.now('Asia/Jakarta')->setDay(1)->setMonth($bulan)->translatedFormat('F') : null,
+            ...app(SaringSpt::class)->ringkasan($f),
         ]));
     }
 

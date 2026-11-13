@@ -4,10 +4,10 @@ namespace App\Services\Ekspor;
 
 use App\Exports\MonitoringSheet;
 use App\Models\Irban;
-use App\Models\JenisPenugasan;
 use App\Models\Spt;
 use App\Models\User;
 use App\Services\MonitoringSpt;
+use App\Services\SaringSpt;
 use App\Support\Tanggal;
 use Illuminate\Support\Facades\Gate;
 
@@ -104,15 +104,18 @@ class PembangunMonitoring implements Pembangun
     /** @return list<string> */
     private function ringkasan(array $f): array
     {
-        return array_values(array_filter([
+        $sebelum = array_filter([
             $f['tw'] ? self::TW[$f['tw']] : null,
             $f['irban'] ? 'Irban: '.Irban::whereKey($f['irban'])->value('nama') : null,
             $f['status'] ? 'Status: '.self::STATUS[$f['status']] : null,
-            $f['jenis'] ? 'Jenis: '.JenisPenugasan::whereKey($f['jenis'])->value('nama') : null,
+        ]);
+        $sesudah = array_filter([
             $f['kesesuaian'] ? 'Kesesuaian: '.self::KESESUAIAN[$f['kesesuaian']] : null,
             $f['penanda'] ? 'Terlambat' : null,
             $f['penjelasan'] ? 'Permintaan Penjelasan Terbuka' : null,
             $f['cari'] !== null ? 'Cari: '.$f['cari'] : null,
-        ]));
+        ]);
+
+        return [...$sebelum, ...app(SaringSpt::class)->ringkasan($f), ...$sesudah];
     }
 }

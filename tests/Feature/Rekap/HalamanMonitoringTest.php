@@ -9,6 +9,8 @@ use App\Livewire\Pimpinan\Monitoring;
 use App\Models\Ekspor as EksporModel;
 use App\Models\Irban;
 use App\Models\JenisPenugasan;
+use App\Models\Klasifikasi;
+use App\Models\KodeArsip;
 use App\Models\Komentar;
 use App\Models\Pegawai;
 use App\Models\Pkpt;
@@ -250,6 +252,25 @@ class HalamanMonitoringTest extends TestCase
         $this->assertSame([5], $this->tampil(['penjelasan' => 'terbuka']));
     }
 
+    /** 1.3 Task 1: the three selects come from the URL, Lainnya is an option, fictitious ids fall back, Atur ulang clears them. */
+    public function test_klasifikasi_kode_arsip_and_jenis_from_the_url(): void
+    {
+        $reguler = Klasifikasi::where('kode', 'REGULER')->value('id');
+        $k800 = KodeArsip::firstOrCreate(['kode' => '800'], ['nama' => 'Kepegawaian'])->id;
+        Spt::whereKey($this->m[1]->id)->update(['klasifikasi_id' => $reguler]);
+        Spt::whereKey($this->m[2]->id)->update(['kode_arsip_id' => $k800]);
+        Spt::whereKey($this->m[5]->id)->update(['jenis_penugasan_id' => null, 'jenis_penugasan_lainnya' => 'Evaluasi khusus']);
+
+        $this->assertSame([1], $this->tampil(['klasifikasi' => (string) $reguler]));
+        $this->assertSame([2], $this->tampil(['kode_arsip' => (string) $k800]));
+        $this->assertSame([5], $this->tampil(['jenis' => 'lainnya']));
+        $this->assertSame([5], $this->tampil(['jenis' => 'lainnya', 'klasifikasi' => '999999'])); // fictitious id ignored, no 500
+        $this->halaman(['klasifikasi' => '999999', 'kode_arsip' => 'x'])->assertSet('klasifikasi', '')->assertSet('kode_arsip', '')
+            ->assertSee('Semua klasifikasi')->assertSee('Semua kode arsip')->assertSee('700 · Pengawasan Umum')->assertSee('Lainnya');
+        $this->halaman(['klasifikasi' => (string) $reguler, 'kode_arsip' => (string) $k800, 'jenis' => 'lainnya'])->call('aturUlang')
+            ->assertSet('klasifikasi', '')->assertSet('kode_arsip', '')->assertSet('jenis', '');
+    }
+
     public function test_invalid_url_values_fall_back(): void
     {
         $this->halaman(['tahun' => 'abc', 'tw' => '9', 'irban' => '999', 'status' => 'xyz', 'jenis' => '999', 'kesesuaian' => 'x', 'penanda' => 'x', 'penjelasan' => 'x'])
@@ -382,7 +403,7 @@ class HalamanMonitoringTest extends TestCase
         $p = app(PembangunMonitoring::class);
         $f = $p->filter($this->pimpinan, ['tahun' => 'abc', 'irban' => '999', 'status' => 'xyz', 'jenis' => (string) $this->j2->id]);
 
-        $this->assertSame(['tahun' => 2026, 'tw' => null, 'irban' => null, 'status' => null, 'jenis' => $this->j2->id, 'kesesuaian' => null, 'penanda' => null, 'penjelasan' => null, 'cari' => null], $f);
+        $this->assertSame(['tahun' => 2026, 'tw' => null, 'irban' => null, 'status' => null, 'klasifikasi' => null, 'kode_arsip' => null, 'jenis' => $this->j2->id, 'kesesuaian' => null, 'penanda' => null, 'penjelasan' => null, 'cari' => null], $f);
         $this->assertSame(1, $p->jumlah($this->pimpinan, $f));
         $this->assertSame('/pimpinan/monitoring', $p->halaman($this->pimpinan));
 

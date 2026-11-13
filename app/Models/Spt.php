@@ -94,6 +94,16 @@ class Spt extends Model
         return $this->tanggal_selesai === null || $hariIni <= $this->tanggal_selesai->toDateString() ? StatusSpt::Pelaksanaan : StatusSpt::PenyusunanLaporan;
     }
 
+    /** Klasifikasi / Kode Arsip / Jenis filter (App\Services\SaringSpt); `jenis` = master id or 'lainnya' (free-text jenis, no master). */
+    public function scopeSaring(Builder $q, array $saring): void
+    {
+        $jenis = $saring['jenis'] ?? null;
+        $q->when(($saring['klasifikasi'] ?? null) !== null, fn ($q) => $q->where('klasifikasi_id', $saring['klasifikasi']))
+            ->when(($saring['kode_arsip'] ?? null) !== null, fn ($q) => $q->where('kode_arsip_id', $saring['kode_arsip']))
+            ->when($jenis === 'lainnya', fn ($q) => $q->whereNull('jenis_penugasan_id')->whereNotNull('jenis_penugasan_lainnya'))
+            ->when($jenis !== null && $jenis !== 'lainnya', fn ($q) => $q->where('jenis_penugasan_id', $jenis));
+    }
+
     /** Irban year (SPT Saya, Irban dashboard): the year of tanggal_mulai; drafts without dates count in the year they were created. */
     public function scopeTahunPenugasan(Builder $q, int $tahun): void
     {

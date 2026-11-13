@@ -16,6 +16,7 @@ use App\Models\NomorCounter;
 use App\Models\Spt;
 use App\Services\Penomoran;
 use App\Services\RegisterNomor;
+use App\Services\SaringSpt;
 use App\Services\Settings;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Gate;
@@ -51,6 +52,16 @@ class Register extends Component
 
     #[Url]
     public string $bulan = '';
+
+    #[Url]
+    public string $klasifikasi = '';
+
+    #[Url]
+    public string $kode_arsip = '';
+
+    /** Master jenis id or 'lainnya'. */
+    #[Url]
+    public string $jenis = '';
 
     /** The pagination control binds here; the register is fixed at 100 rows per page. */
     public int $perPage = self::PER_HALAMAN;
@@ -90,12 +101,20 @@ class Register extends Component
     public function updated(string $prop): void
     {
         Gate::authorize('kelolaNomor', Spt::class);
-        if (in_array($prop, ['tahun', 'cari', 'status', 'irban', 'bulan'], true)) {
+        if (in_array($prop, ['tahun', 'cari', 'status', 'irban', 'bulan', 'klasifikasi', 'kode_arsip', 'jenis'], true)) {
             $this->resetPage();
         }
         if (str_starts_with($prop, 'manual')) {
             $this->hitungPratinjau();
         }
+    }
+
+    /** Clears every filter but Tahun. */
+    public function aturUlang(): void
+    {
+        Gate::authorize('kelolaNomor', Spt::class);
+        $this->reset('cari', 'status', 'irban', 'bulan', 'klasifikasi', 'kode_arsip', 'jenis');
+        $this->resetPage();
     }
 
     public function bukaManual(): void
@@ -216,7 +235,8 @@ class Register extends Component
 
     private function filter(): array
     {
-        return ['tahun' => $this->tahun, 'cari' => $this->cari, 'status' => $this->status, 'irban' => $this->irban, 'bulan' => $this->bulan];
+        return ['tahun' => $this->tahun, 'cari' => $this->cari, 'status' => $this->status, 'irban' => $this->irban, 'bulan' => $this->bulan,
+            'klasifikasi' => $this->klasifikasi, 'kode_arsip' => $this->kode_arsip, 'jenis' => $this->jenis];
     }
 
     private function hitungPratinjau(): void
@@ -233,6 +253,10 @@ class Register extends Component
     {
         Gate::authorize('kelolaNomor', Spt::class);
         $register = app(RegisterNomor::class);
+        // Validate on every render and write back, so unknown URL values fall back visibly (as Monitoring does).
+        foreach (app(SaringSpt::class)->dari($this->only('klasifikasi', 'kode_arsip', 'jenis')) as $k => $v) {
+            $this->{$k} = (string) $v;
+        }
         $tahunIni = CarbonImmutable::now('Asia/Jakarta')->year;
         $tahunList = Spt::whereNotNull('nomor_urut')->whereNotNull('tahun')->distinct()->pluck('tahun')->push($tahunIni, $this->tahun)->unique()->sortDesc()->mapWithKeys(fn ($t) => [$t => (string) $t])->all();
         $perIrban = app(Settings::class)->get('penomoran.scope') === 'per_irban';
@@ -249,6 +273,7 @@ class Register extends Component
             'klasifikasiOptions' => Klasifikasi::aktif()->urut()->pluck('nama', 'id')->all(),
             'kodeArsipOptions' => KodeArsip::orderBy('kode')->get()->mapWithKeys(fn ($k) => [$k->id => $k->kode.' · '.$k->nama])->all(),
             'jenisOptions' => JenisPenugasan::orderBy('nama')->pluck('nama', 'id')->all(),
+            'saringOpsi' => app(SaringSpt::class)->opsi(),
             'perIrban' => $perIrban,
             'awalTerkunci' => $register->nomorAwalTerkunci($this->tahun, $perIrban ? $awalIrban : null),
             'terkunciHalaman' => ! $perIrban && $register->nomorAwalTerkunci($this->tahun, null),

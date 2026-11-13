@@ -220,6 +220,22 @@
                 @endif
             </x-ui.card>
 
+            {{-- Realisasi Dana (versi 1.3 Task 3): every role that can view sees it; only the owning Irban gets the button, while UbahRealisasiDana::cegah() allows it. --}}
+            <x-ui.card class="order-2 lg:order-none">
+                <h2 id="judul-dana" class="{{ $judulKartu }}">Realisasi Dana</h2>
+                @if ($spt->realisasi_dana !== null)
+                    <p class="mt-2 text-xl font-semibold text-neutral-900 tabular-nums [overflow-wrap:anywhere]">{{ \App\Support\Rupiah::format($spt->realisasi_dana) }}</p>
+                @else
+                    <p class="mt-2 text-sm text-neutral-600">Belum diisi.</p>
+                @endif
+                @if ($ubahDana && $blokirDana === null)
+                    <x-ui.button type="button" id="aksi-dana" variant="secondary" icon="pencil-square" class="mt-3 max-sm:w-full" wire:click="buka('dana')"
+                        aria-describedby="judul-dana">{{ $spt->realisasi_dana === null ? 'Isi Realisasi Dana' : 'Ubah Realisasi Dana' }}</x-ui.button>
+                @elseif ($ubahDana)
+                    <p class="mt-2 text-sm text-neutral-600">{{ $blokirDana }}</p>
+                @endif
+            </x-ui.card>
+
             <x-ui.card class="order-2 lg:order-none">
                 <h2 class="{{ $judulKartu }}">Riwayat Status</h2>
                 @if ($spt->riwayat->isEmpty())
@@ -239,6 +255,8 @@
                                     <p class="mt-1 tabular-nums text-neutral-900">{{ $rentangNilai($r->nilai_lama) }} → {{ $rentangNilai($r->nilai_baru) }}</p>
                                 @elseif ($r->kejadian === KejadianSpt::SPPD_DIUBAH)
                                     <p class="mt-1 tabular-nums text-neutral-900 [overflow-wrap:anywhere]">{{ $r->nilai_lama['nomor_sppd'] ?? '—' }} → {{ $r->nilai_baru['nomor_sppd'] ?? '—' }}</p>
+                                @elseif ($r->kejadian === KejadianSpt::DANA_DIUBAH)
+                                    <p class="mt-1 tabular-nums text-neutral-900 [overflow-wrap:anywhere]">{{ \App\Support\Rupiah::format($r->nilai_lama['realisasi_dana'] ?? null) }} → {{ \App\Support\Rupiah::format($r->nilai_baru['realisasi_dana'] ?? null) }}</p>
                                 @endif
                                 @if ($r->alasan)<p class="mt-1 whitespace-pre-line text-neutral-600">{{ $r->alasan }}</p>@endif
                             </li>
@@ -287,7 +305,7 @@
         </div>
     </div>
 
-    @if ($laksanakan || $modalBatal)
+    @if ($laksanakan || $modalBatal || $ubahDana)
         @include('livewire.spt.partials.aksi-modal')
     @endif
 </div>

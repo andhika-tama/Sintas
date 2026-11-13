@@ -64,6 +64,12 @@ class SptPolicy
         return $user->role === Role::BagianUmum && $this->view($user, $spt) && in_array($spt->status_pengajuan, [StatusPengajuan::MenungguNomor, StatusPengajuan::Diterima], true);
     }
 
+    /** Realisasi dana (versi 1.3 K4): the owning Irban. Role/ownership only; the state rule is UbahRealisasiDana::cegah(). */
+    public function ubahDana(User $user, Spt $spt): bool
+    {
+        return $this->milik($user, $spt);
+    }
+
     /** Rekap Triwulanan (Pimpinan) and Rekap Saya (Irban with an irban); read-only. */
     public function rekap(User $user): bool
     {

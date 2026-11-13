@@ -68,7 +68,7 @@
         @endphp
         <form id="form-aksi-selesai" wire:submit="tandaiSelesai" novalidate class="space-y-5">
             @include('auth.partials.error-summary', ['class' => '', 'fields' => [
-                'berkas' => $lhp ? 'Cover LHP' : 'Dokumen', 'nomor_lhp' => 'Nomor LHP', 'tanggal_lhp' => 'Tanggal LHP', 'konfirmasi' => 'Konfirmasi', 'diinput_oleh' => 'Diinput oleh',
+                'berkas' => $lhp ? 'Cover LHP' : 'Dokumen', 'nomor_lhp' => 'Nomor LHP', 'tanggal_lhp' => 'Tanggal LHP', 'konfirmasi' => 'Konfirmasi', 'realisasi_dana' => 'Realisasi dana', 'diinput_oleh' => 'Diinput oleh',
             ]])
             @if ($blokir)
                 <x-ui.alert variant="warning" id="selesai-blokir"><p>{{ $blokir }}</p></x-ui.alert>
@@ -89,6 +89,8 @@
                 <x-ui.input type="date" :label="$lhp ? 'Tanggal LHP' : 'Tanggal LHP (opsional)'" name="tanggal_lhp" wire:model="tanggal_lhp" :required="$lhp"
                     :min="$spt->tanggal_mulai?->toDateString()" :max="$hariIni" :error="$errors->first('tanggal_lhp')" class="tabular-nums" />
             @endif
+            <x-ui.input-rupiah label="Realisasi dana (opsional)" name="realisasi_dana" id="realisasi_dana" wire:model="realisasi_dana" :value="$realisasi_dana"
+                helper="Dapat diisi atau diubah nanti dari halaman detail." :error="$errors->first('realisasi_dana')" />
         </form>
     @endif
     <x-slot:footer>
@@ -118,6 +120,25 @@
         @if ($aktif === 'kendala')
             @include('livewire.spt.partials.aksi-footer', ['modal' => 'kendala'])
             <x-ui.button form="form-aksi-kendala" icon="check" wire:loading.attr="disabled" wire:target="simpanKendala" class="max-sm:w-full">Simpan Kendala</x-ui.button>
+        @endif
+    </x-slot:footer>
+</x-ui.modal>
+@endif
+
+{{-- Realisasi Dana (versi 1.3 Task 3): owning Irban; gated on the policy only so a stale tab's save becomes a toast (UbahRealisasiDana::cegah()). --}}
+@if ($ubahDana)
+<x-ui.modal name="aksi-dana" title="Realisasi Dana">
+    @if ($aktif === 'dana')
+        <form id="form-aksi-dana" wire:submit="simpanDana" novalidate class="space-y-5">
+            @include('auth.partials.error-summary', ['class' => '', 'fields' => ['realisasi_dana' => 'Realisasi dana', 'diinput_oleh' => 'Diinput oleh']])
+            <x-ui.input-rupiah label="Realisasi dana" name="realisasi_dana" id="realisasi_dana" wire:model="realisasi_dana" :value="$realisasi_dana"
+                helper="Dalam Rupiah. Kosongkan lalu simpan untuk menghapus nilai." :error="$errors->first('realisasi_dana')" />
+        </form>
+    @endif
+    <x-slot:footer>
+        @if ($aktif === 'dana')
+            @include('livewire.spt.partials.aksi-footer', ['modal' => 'dana'])
+            <x-ui.button form="form-aksi-dana" icon="check" wire:loading.attr="disabled" wire:target="simpanDana" class="max-sm:w-full">Simpan</x-ui.button>
         @endif
     </x-slot:footer>
 </x-ui.modal>

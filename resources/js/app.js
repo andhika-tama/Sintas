@@ -2,6 +2,7 @@ import { Livewire, Alpine } from '../../vendor/livewire/livewire/dist/livewire.e
 import kotakMasuk from './kotak-masuk';
 import kalenderPkpt from './kalender';
 import countUp from './countup';
+import inputRupiah from './input-rupiah';
 import { grafikRealisasi, grafikStatus } from './grafik';
 
 // Livewire's bundled Alpine already includes intersect, focus and sort; do not register them again.
@@ -19,6 +20,7 @@ document.addEventListener('livewire:navigated', () => {
 Alpine.data('kotakMasuk', kotakMasuk);
 Alpine.data('kalenderPkpt', kalenderPkpt);
 Alpine.data('countUp', countUp);
+Alpine.data('inputRupiah', inputRupiah);
 Alpine.data('grafikRealisasi', grafikRealisasi);
 Alpine.data('grafikStatus', grafikStatus);
 

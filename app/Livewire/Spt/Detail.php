@@ -7,6 +7,7 @@ use App\Actions\Spt\Concerns\IzinPelaksanaan;
 use App\Actions\Spt\SimpanKendala;
 use App\Actions\Spt\TandaiSelesai;
 use App\Actions\Spt\UbahNomorSppd;
+use App\Actions\Spt\UbahRealisasiDana;
 use App\Actions\Spt\UbahTanggalRealisasi;
 use App\Actions\Spt\UnggahDokumenSpt;
 use App\Enums\Role;
@@ -26,9 +27,9 @@ use Livewire\WithFileUploads;
 
 /**
  * Shared SPT detail page (_shared.md §7), any role allowed by SptPolicy::view, with the four Irban action modals
- * (Ubah Tanggal, Unggah SPT Final, Tandai Selesai, Kendala) plus Batalkan Penugasan for the owning Irban (versi 1.2.1 Task 4).
+ * (Ubah Tanggal, Unggah SPT Final, Tandai Selesai, Kendala) plus Batalkan Penugasan (versi 1.2.1 Task 4) and Realisasi Dana (versi 1.3 Task 3) for the owning Irban.
  * The component only collects input and calls the actions; the actions authorize (`laksanakan`, `batalkan`) and hold every rule
- * (the UI reads TandaiSelesai::syarat()/bisa() and BatalkanNomor::cegah()).
+ * (the UI reads TandaiSelesai::syarat()/bisa(), BatalkanNomor::cegah() and UbahRealisasiDana::cegah()).
  * The Nomor SPPD panel is editable for `ubahSppd` (Bagian Umum) through UbahNomorSppd, read-only for everyone else.
  */
 class Detail extends Component
@@ -40,9 +41,10 @@ class Detail extends Component
     private const FIELDS = [
         'tanggal' => ['tanggal_mulai', 'tanggal_selesai', 'alasan', 'diinput_oleh'],
         'final' => ['berkas', 'diinput_oleh'],
-        'selesai' => ['berkas', 'nomor_lhp', 'tanggal_lhp', 'konfirmasi', 'diinput_oleh'],
+        'selesai' => ['berkas', 'nomor_lhp', 'tanggal_lhp', 'konfirmasi', 'realisasi_dana', 'diinput_oleh'],
         'kendala' => ['kategori', 'uraian', 'diinput_oleh'],
         'batal' => ['alasan', 'diinput_oleh'],
+        'dana' => ['realisasi_dana', 'diinput_oleh'],
     ];
 
     #[Locked]
@@ -64,6 +66,9 @@ class Detail extends Component
     public string $tanggal_lhp = '';
 
     public bool $konfirmasi = false;
+
+    /** Digits only or '' (x-ui.input-rupiah); shared by the Realisasi Dana and Tandai Selesai modals, only one of which renders at a time. */
+    public string $realisasi_dana = '';
 
     public string $kategori = '';
 
@@ -102,12 +107,19 @@ class Detail extends Component
         $this->dispatch('toast', type: 'success', message: $spt->nomor_sppd === null ? 'Nomor SPPD dihapus' : 'Nomor SPPD disimpan');
     }
 
-    public function buka(string $modal, BatalkanNomor $batal): void
+    public function buka(string $modal, BatalkanNomor $batal, UbahRealisasiDana $dana): void
     {
         $spt = $this->sptDasar();
         if ($modal === 'batal') {
             Gate::authorize('batalkan', $spt);
             if ($pesan = $batal->cegah($spt)) {
+                $this->galatUmum($pesan);
+
+                return;
+            }
+        } elseif ($modal === 'dana') {
+            Gate::authorize('ubahDana', $spt);
+            if ($pesan = $dana->cegah($spt)) {
                 $this->galatUmum($pesan);
 
                 return;
@@ -126,6 +138,7 @@ class Detail extends Component
         }
         $this->resetValidation();
         $this->reset('alasan', 'berkas', 'nomor_lhp', 'tanggal_lhp', 'konfirmasi', 'ganti');
+        $this->realisasi_dana = (string) $spt->realisasi_dana;
         $this->tanggal_mulai = (string) $spt->tanggal_mulai?->toDateString();
         $this->tanggal_selesai = (string) $spt->tanggal_selesai?->toDateString();
         $kendala = $spt->kendala()->first();
@@ -138,7 +151,9 @@ class Detail extends Component
 
     public function gantiPenginput(): void
     {
-        Gate::authorize($this->modal === 'batal' ? 'batalkan' : 'laksanakan', $this->sptDasar());
+        Gate::authorize(match ($this->modal) {
+            'batal' => 'batalkan', 'dana' => 'ubahDana', default => 'laksanakan'
+        }, $this->sptDasar());
         $this->ganti = true;
     }
 
@@ -162,7 +177,7 @@ class Detail extends Component
     {
         // The action buttons vanish once Selesai, so focus goes to the h1.
         $this->jalankan('selesai', 'SPT ditandai Selesai', fn (Spt $spt) => $aksi->handle(
-            auth()->user(), $spt, $this->only('diinput_oleh', 'konfirmasi', 'nomor_lhp', 'tanggal_lhp'), $this->berkas,
+            auth()->user(), $spt, $this->only('diinput_oleh', 'konfirmasi', 'nomor_lhp', 'tanggal_lhp', 'realisasi_dana'), $this->berkas,
         ), 'judul-spt');
     }
 
@@ -170,6 +185,12 @@ class Detail extends Component
     {
         // The perlu-kendala alert (and its button) disappears once a kendala exists, so focus goes to the header button.
         $this->jalankan('kendala', 'Kendala disimpan', fn (Spt $spt) => $aksi->handle(auth()->user(), $spt, $this->only(self::FIELDS['kendala'])), 'aksi-kendala');
+    }
+
+    public function simpanDana(UbahRealisasiDana $aksi): void
+    {
+        // The panel button is re-rendered with a new label, so focus goes to it by id.
+        $this->jalankan('dana', 'Realisasi dana disimpan', fn (Spt $spt) => $aksi->handle(auth()->user(), $spt, $this->only('realisasi_dana', 'diinput_oleh')), 'aksi-dana');
     }
 
     public function batalkan(BatalkanNomor $aksi): void
@@ -245,7 +266,7 @@ class Detail extends Component
         return $spt;
     }
 
-    public function render(PenandaSpt $penanda, KesesuaianPkpt $kesesuaian, Settings $settings, TandaiSelesai $selesai, BatalkanNomor $batal)
+    public function render(PenandaSpt $penanda, KesesuaianPkpt $kesesuaian, Settings $settings, TandaiSelesai $selesai, BatalkanNomor $batal, UbahRealisasiDana $dana)
     {
         $spt = $this->spt();
         $item = $spt->pkptItem;
@@ -257,7 +278,11 @@ class Detail extends Component
         $tombolBatal = $user->role === Role::Irban && $user->can('batalkan', $spt) && $spt->status_pengajuan === StatusPengajuan::Diterima;
         // The batal modal is gated on the policy only, not the status: after a Selesai/Dibatalkan in another tab it stays open and its save becomes a toast.
         $modalBatal = $user->role === Role::Irban && $user->can('batalkan', $spt);
-        $modal = ($this->modal === 'batal' ? $modalBatal : $laksanakan) ? $this->modal : '';
+        // Realisasi Dana: also gated on the policy only; the state rule (cegah) blocks the button and turns a stale save into a toast.
+        $ubahDana = $user->can('ubahDana', $spt);
+        $modal = match ($this->modal) {
+            'batal' => $modalBatal, 'dana' => $ubahDana, default => $laksanakan
+        } ? $this->modal : '';
 
         return view('livewire.spt.detail', [
             'spt' => $spt,
@@ -272,6 +297,8 @@ class Detail extends Component
             'tombolBatal' => $tombolBatal,
             'modalBatal' => $modalBatal,
             'blokirBatal' => $tombolBatal ? $batal->cegah($spt) : null,
+            'ubahDana' => $ubahDana,
+            'blokirDana' => $ubahDana ? $dana->cegah($spt) : null,
             'bisaUbah' => auth()->user()->can('update', $spt),
             'ubahSppd' => $ubahSppd,
             'tahunSppd' => $tahunSppd,

@@ -58,6 +58,7 @@ class Spt extends Model
             'tanggal_selesai' => 'immutable_date',
             'tanggal_spt' => 'immutable_date',
             'tanggal_lhp' => 'immutable_date',
+            'realisasi_dana' => 'integer',
             'diajukan_pada' => 'immutable_datetime',
             'ditandai_selesai_pada' => 'immutable_datetime',
             'terlambat_diberitahu_pada' => 'immutable_datetime',

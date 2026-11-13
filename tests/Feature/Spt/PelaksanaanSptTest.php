@@ -410,6 +410,45 @@ class PelaksanaanSptTest extends TestCase
         $this->assertSame(['syarat' => 'konfirmasi', 'nomor_lhp' => null, 'tanggal_lhp' => null], $spt->riwayat()->where('kejadian', KejadianSpt::DITANDAI_SELESAI)->sole()->nilai_baru);
     }
 
+    public function test_tandai_selesai_tanpa_dan_dengan_realisasi_dana(): void
+    {
+        $tanpa = $this->spt('DIKLAT');
+        $this->selesai($tanpa, ['konfirmasi' => true]);
+        $this->assertNull($tanpa->fresh()->realisasi_dana);
+        $this->assertSame(0, $tanpa->riwayat()->where('kejadian', KejadianSpt::DANA_DIUBAH)->count());
+
+        $this->selesai($this->spt('DIKLAT'), ['konfirmasi' => true, 'realisasi_dana' => '']);
+
+        $dengan = $this->spt('DIKLAT');
+        $this->selesai($dengan, ['konfirmasi' => true, 'realisasi_dana' => 'Rp 2.500.000']);
+        $this->assertSame(2500000, $dengan->fresh()->realisasi_dana);
+        $r = $dengan->riwayat()->where('kejadian', KejadianSpt::DANA_DIUBAH)->sole();
+        $this->assertSame(['realisasi_dana' => null], $r->nilai_lama);
+        $this->assertSame(['realisasi_dana' => 2500000], $r->nilai_baru);
+        $this->assertSame($this->penginput->id, $r->diinput_oleh);
+    }
+
+    public function test_tandai_selesai_dana_sama_tidak_mencatat_dan_kosong_tidak_menghapus(): void
+    {
+        $spt = $this->spt('DIKLAT', ['realisasi_dana' => 900]);
+        $this->selesai($spt, ['konfirmasi' => true, 'realisasi_dana' => '900']);
+        $this->assertSame(0, $spt->riwayat()->where('kejadian', KejadianSpt::DANA_DIUBAH)->count());
+        $lain = $this->spt('DIKLAT', ['realisasi_dana' => 900]);
+        $this->selesai($lain, ['konfirmasi' => true, 'realisasi_dana' => '']);
+        $this->assertSame(900, $lain->fresh()->realisasi_dana);
+    }
+
+    public function test_tandai_selesai_dana_aneh_atau_gagal_membatalkan_semuanya(): void
+    {
+        $spt = $this->spt('DIKLAT');
+        $this->gagal(fn () => $this->selesai($spt, ['konfirmasi' => true, 'realisasi_dana' => '-5']), 'realisasi_dana', 'Realisasi dana harus berupa angka Rupiah, tidak boleh minus.');
+        $this->gagal(fn () => $this->selesai($spt, ['konfirmasi' => true, 'realisasi_dana' => '1000000000000']), 'realisasi_dana', 'Realisasi dana maksimal Rp999.999.999.999.');
+        $this->gagal(fn () => $this->selesai($spt, ['realisasi_dana' => '500']), 'konfirmasi');
+        $spt->refresh();
+        $this->assertNull($spt->ditandai_selesai_pada);
+        $this->assertNull($spt->realisasi_dana);
+    }
+
     #[DataProvider('opsional')]
     public function test_opsional_diterima_tanpa_dan_dengan_pdf(string $kode): void
     {

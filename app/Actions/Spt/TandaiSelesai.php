@@ -20,15 +20,16 @@ use Illuminate\Validation\ValidationException;
 /**
  * Irban marks an SPT Selesai; what is required follows the klasifikasi's `syarat_selesai` at that moment (PRD §9.4).
  *
- * handle(User, Spt, array{diinput_oleh, konfirmasi?, nomor_lhp?, tanggal_lhp?}, ?UploadedFile $berkas = null): Spt
+ * handle(User, Spt, array{diinput_oleh, konfirmasi?, nomor_lhp?, tanggal_lhp?, realisasi_dana?}, ?UploadedFile $berkas = null): Spt
+ * A filled `realisasi_dana` that differs from the stored one is saved (with its own riwayat) in the same transaction; empty leaves it as is.
  * The UI reads syarat() and bisa() instead of recomputing the rules.
- * Errors: `spt` (blocked or already Selesai), `berkas`, `konfirmasi`, `nomor_lhp`, `tanggal_lhp`, `diinput_oleh`.
+ * Errors: `spt` (blocked or already Selesai), `berkas`, `konfirmasi`, `nomor_lhp`, `tanggal_lhp`, `realisasi_dana`, `diinput_oleh`.
  */
 class TandaiSelesai
 {
     use MelaksanakanSpt;
 
-    public function __construct(private PenandaSpt $penanda, private Settings $settings) {}
+    public function __construct(private PenandaSpt $penanda, private Settings $settings, private UbahRealisasiDana $dana) {}
 
     public function syarat(Spt $spt): SyaratSelesai
     {
@@ -61,6 +62,11 @@ class TandaiSelesai
                 $e = [];
                 $diinput = $this->penginput($user, $data, $e);
                 $kolom = $this->periksa($syarat, $spt, $data, $berkas, $e);
+                try {
+                    $danaBaru = UbahRealisasiDana::baca($data['realisasi_dana'] ?? null);
+                } catch (ValidationException $ex) {
+                    $e += array_map(fn ($m) => $m[0], $ex->errors());
+                }
                 if ($e) {
                     throw ValidationException::withMessages($e);
                 }
@@ -75,6 +81,9 @@ class TandaiSelesai
                     'kejadian' => KejadianSpt::DITANDAI_SELESAI, 'oleh' => $user->id, 'diinput_oleh' => $diinput,
                     'nilai_baru' => ['syarat' => $syarat->value, 'nomor_lhp' => $kolom['nomor_lhp'] ?? null, 'tanggal_lhp' => $kolom['tanggal_lhp'] ?? null],
                 ]);
+                if ($danaBaru !== null) {
+                    $this->dana->terapkan($user, $spt, $danaBaru, $diinput);
+                }
 
                 return [$spt, $diinput];
             });

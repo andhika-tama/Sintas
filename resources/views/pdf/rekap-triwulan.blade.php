@@ -52,10 +52,10 @@
             <div class="blok">
                 @if ($t['judul'])<h3>{{ $t['judul'] }}</h3>@endif
                 <table>
-                    <thead><tr><th>{{ ['rr' => 'Triwulan', 'klasifikasi' => 'Klasifikasi', 'jenis' => 'Jenis Penugasan'][$s['kode']] }}</th>@foreach ($s['kolom'] as $k)<th class="n">{{ $k }}</th>@endforeach</tr></thead>
+                    <thead><tr><th>{{ ['rr' => 'Triwulan', 'dana' => 'Triwulan', 'klasifikasi' => 'Klasifikasi', 'jenis' => 'Jenis Penugasan'][$s['kode']] }}</th>@foreach ($s['kolom'] as $j => $k)<th @class(['n' => ! ($s['kode'] === 'dana' && $j === 1)])>{{ $k }}</th>@endforeach</tr></thead>
                     <tbody>
                         @foreach ($t['baris'] as $b)
-                            <tr @class(['total' => $b['total']])><th>{{ $s['kode'] === 'rr' ? $b['periode'] : $b['label'] }}</th>@foreach ($b['sel'] as $j => $n)<td class="n">{{ $n }}{{ ($b['lebih'] ?? null) === $j ? ' *' : '' }}</td>@endforeach</tr>
+                            <tr @class(['total' => $b['total']])><th>{{ in_array($s['kode'], ['rr', 'dana'], true) ? $b['periode'] : $b['label'] }}</th>@foreach ($b['sel'] as $j => $n)<td @class(['n' => ! ($s['kode'] === 'dana' && $j === 1)])>{{ $s['kode'] === 'dana' && $j === 0 ? \App\Support\Rupiah::format($n) : $n }}{{ ($b['lebih'] ?? null) === $j ? ' *' : '' }}</td>@endforeach</tr>
                         @endforeach
                     </tbody>
                 </table>

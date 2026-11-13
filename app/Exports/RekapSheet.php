@@ -34,7 +34,10 @@ class RekapSheet extends DefaultValueBinder implements FromArray, WithColumnWidt
     /** neutral-300 (DESIGN §13). */
     public const GARIS = 'B8C4C0';
 
-    public const LEBAR = ['label' => 45, 'teks' => 22, 'nomor' => 34, 'tanggal' => 26, 'angka' => 12, 'panjang' => 60];
+    public const LEBAR = ['label' => 45, 'teks' => 22, 'nomor' => 34, 'tanggal' => 26, 'angka' => 12, 'rupiah' => 18, 'panjang' => 60];
+
+    /** Number format of a 'rupiah' column: the cell stays a number (summable in Excel), only the display shows Rp. */
+    public const FORMAT_RUPIAH = '"Rp"#,##0';
 
     private const BUNGKUS = ['label', 'teks', 'tanggal', 'panjang'];
 
@@ -144,8 +147,11 @@ class RekapSheet extends DefaultValueBinder implements FromArray, WithColumnWidt
                 foreach ($t['tipe'] as $i => $tipe) {
                     $k = Coordinate::stringFromColumnIndex($i + 1);
                     $sel = $s->getStyle($k.($t['kepala'] + 1).':'.$k.$t['akhir'])->getAlignment()->setVertical(Alignment::VERTICAL_TOP)->setWrapText(in_array($tipe, self::BUNGKUS, true));
-                    if ($tipe === 'angka') {
+                    if (in_array($tipe, ['angka', 'rupiah'], true)) {
                         $sel->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+                    }
+                    if ($tipe === 'rupiah') {
+                        $s->getStyle($k.($t['kepala'] + 1).':'.$k.$t['akhir'])->getNumberFormat()->setFormatCode(self::FORMAT_RUPIAH);
                     }
                 }
                 foreach ($t['total'] as $r) {

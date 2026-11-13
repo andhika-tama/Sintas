@@ -150,6 +150,24 @@ class MonitoringSptTest extends TestCase
         $this->assertSame(StatusSpt::SiapDilaksanakan, $luar['spt'][1]['status']);
     }
 
+    /** 1.3 Task 4: `dana` is the raw int (null = not filled, 0 stays 0) in baris(), daftar() and barisSpt(). */
+    public function test_rows_carry_dana(): void
+    {
+        $this->m[1]->forceFill(['realisasi_dana' => 600000])->save();
+        $this->m[4]->forceFill(['realisasi_dana' => 0])->save();
+        $per = fn (array $rows) => array_column(array_map(fn ($r) => ['id' => $r['id'], 'dana' => $r['dana']], $rows), 'dana', 'id');
+
+        $dari = $per(array_merge(...array_column(app(MonitoringSpt::class)->baris([]), 'spt')));
+        $this->assertSame(600000, $dari[$this->m[1]->id]);
+        $this->assertSame(0, $dari[$this->m[4]->id]);
+        $this->assertNull($dari[$this->m[2]->id]);
+        $daftar = $per(app(MonitoringSpt::class)->daftar([]));
+        ksort($dari);
+        ksort($daftar);
+        $this->assertSame($dari, $daftar);
+        $this->assertSame(600000, app(MonitoringSpt::class)->barisSpt(collect([$this->m[1]->fresh()]))[0]['dana']);
+    }
+
     public function test_each_filter_alone(): void
     {
         $cases = [

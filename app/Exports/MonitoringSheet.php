@@ -35,7 +35,7 @@ class MonitoringSheet extends DefaultValueBinder implements FromArray, WithColum
     public const BARIS_HEADER = 4;
 
     /** Width type per PembangunMonitoring::KOLOM column (RekapSheet::LEBAR keys). */
-    private const TIPE = ['nomor', 'teks', 'teks', 'panjang', 'tanggal', 'tanggal', 'teks', 'teks', 'panjang'];
+    private const TIPE = ['nomor', 'teks', 'teks', 'panjang', 'tanggal', 'tanggal', 'teks', 'teks', 'rupiah', 'panjang'];
 
     /** Wrapped in the sheet; every body column that holds free text or a multi-line list. */
     private const BUNGKUS = ['teks', 'tanggal', 'panjang'];
@@ -106,7 +106,12 @@ class MonitoringSheet extends DefaultValueBinder implements FromArray, WithColum
             $s->getStyle("A{$h}:{$z}{$h}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER)->setVertical(Alignment::VERTICAL_CENTER)->setWrapText(true);
             foreach (self::TIPE as $i => $tipe) {
                 $k = Coordinate::stringFromColumnIndex($i + 1);
-                $s->getStyle($k.($h + 1).':'.$k.max($akhir, $h + 1))->getAlignment()->setVertical(Alignment::VERTICAL_TOP)->setWrapText(in_array($tipe, self::BUNGKUS, true));
+                $sel = $s->getStyle($k.($h + 1).':'.$k.max($akhir, $h + 1));
+                $sel->getAlignment()->setVertical(Alignment::VERTICAL_TOP)->setWrapText(in_array($tipe, self::BUNGKUS, true));
+                if ($tipe === 'rupiah') {
+                    $sel->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+                    $sel->getNumberFormat()->setFormatCode(RekapSheet::FORMAT_RUPIAH);
+                }
             }
             $s->setAutoFilter("A{$h}:{$z}{$akhir}");
             $s->freezePane('B'.($h + 1)); // header row and the Nomor SPT column stay in view

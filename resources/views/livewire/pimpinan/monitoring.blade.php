@@ -86,15 +86,16 @@
                     <x-ui.th>Jenis Penugasan</x-ui.th>
                     <x-ui.th class="whitespace-normal!">Periode Penugasan (PKPT)</x-ui.th>
                     <x-ui.th>Realisasi Periode</x-ui.th>
-                    <x-ui.th class="min-w-36 whitespace-normal!">Kesesuaian dengan Jadwal PKPT</x-ui.th>
+                    <x-ui.th class="min-w-28 whitespace-normal!">Kesesuaian dengan Jadwal PKPT</x-ui.th>
                     <x-ui.th>Status</x-ui.th>
+                    <x-ui.th numeric class="whitespace-normal!">Realisasi Dana</x-ui.th>
                     <x-ui.th class="whitespace-normal!">Permasalahan/Kendala</x-ui.th>
                 </x-slot:head>
                 @foreach ($grup as $g)
                     @php $p = $periode($g); @endphp
                     <tbody wire:key="g-{{ $g['item_id'] ?? 'luar' }}-{{ $kunci }}" x-data="{ buka: @js($terbuka) }" x-on:monitoring-grup.window="buka = $event.detail">
                         <tr>
-                            <th scope="rowgroup" colspan="6" class="h-12 bg-neutral-50 px-2 text-left text-sm font-semibold text-neutral-900">
+                            <th scope="rowgroup" colspan="7" class="h-12 bg-neutral-50 px-2 text-left text-sm font-semibold text-neutral-900">
                                 {{-- sticky + w-max: the label and the SPT count stay in view while the table scrolls sideways (the row spans the whole table width). --}}
                                 <div class="sticky left-0 flex w-max items-center gap-x-3 gap-y-1">
                                     <button type="button" x-on:click="buka = !buka" x-bind:aria-expanded="buka.toString()" aria-expanded="{{ $terbuka ? 'true' : 'false' }}"
@@ -120,13 +121,13 @@
                         @foreach ($g['spt'] as $r)
                             <tr wire:key="s-{{ $r['id'] }}-{{ $kunci }}" x-show="buka" @unless ($terbuka) x-cloak @endunless>
                                 <td class="min-w-48 !pl-10 before:absolute before:inset-y-0 before:left-6 before:w-0.5 before:bg-neutral-200">
-                                    <a href="{{ $r['url'] }}" wire:navigate class="font-medium whitespace-nowrap text-mint-700 underline-offset-2 hover:underline">{{ $r['nomor_lengkap'] }}</a>
+                                    <a href="{{ $r['url'] }}" wire:navigate class="font-medium [overflow-wrap:anywhere] text-mint-700 underline-offset-2 hover:underline">{{ $r['nomor_lengkap'] }}</a>
                                     <span class="block text-xs text-neutral-600 [overflow-wrap:anywhere]">{{ $r['jenis']['nama'] ?? 'Tanpa jenis penugasan' }} · {{ $r['irban'] }}</span>
                                     <span class="block text-xs text-neutral-600 [overflow-wrap:anywhere]">{{ \App\Services\MonitoringSpt::timPpj($r, true) }}</span>
                                 </td>
-                                <td class="min-w-28 text-neutral-600">{{ $p ?? '–' }}</td>
-                                <td class="min-w-32">{{ $r['mulai'] && $r['selesai'] ? Tanggal::rentang($r['mulai'], $r['selesai']) : '–' }}</td>
-                                @include('livewire.pimpinan.partials.spt-sel')
+                                <td class="min-w-24 text-neutral-600">{{ $p ?? '–' }}</td>
+                                <td class="min-w-28">{{ $r['mulai'] && $r['selesai'] ? Tanggal::rentang($r['mulai'], $r['selesai']) : '–' }}</td>
+                                @include('livewire.pimpinan.partials.spt-sel', ['dana' => true])
                             </tr>
                         @endforeach
                     </tbody>
@@ -163,6 +164,7 @@
                                     <p class="text-sm text-neutral-600 tabular-nums">{{ $r['mulai'] && $r['selesai'] ? Tanggal::rentang($r['mulai'], $r['selesai']) : '–' }}</p>
                                     <a href="{{ $r['url'] }}" wire:navigate class="inline-flex min-h-11 items-center text-sm font-medium [overflow-wrap:anywhere] text-mint-700 underline-offset-2 hover:underline">{{ $r['nomor_lengkap'] }}</a>
                                     <p class="text-xs text-neutral-600 [overflow-wrap:anywhere]">{{ \App\Services\MonitoringSpt::timPpj($r, true) }}</p>
+                                    <p class="text-xs text-neutral-600 tabular-nums">Realisasi Dana: {{ \App\Support\Rupiah::format($r['dana']) }}</p>
                                 </li>
                             @endforeach
                         </ul>

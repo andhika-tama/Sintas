@@ -51,20 +51,23 @@
                             @endif
                             <x-ui.table density="compact" label="{{ $s['judul'] }}{{ $t['judul'] ? ' '.$t['judul'] : '' }}">
                                 <x-slot:head>
-                                    <x-ui.th>{{ $i === 0 ? 'Triwulan' : ($i === 1 ? 'Klasifikasi' : 'Jenis Penugasan') }}</x-ui.th>
-                                    @foreach ($s['kolom'] as $k)
-                                        <x-ui.th numeric>{{ $k }}</x-ui.th>
+                                    <x-ui.th>{{ ['rr' => 'Triwulan', 'dana' => 'Triwulan', 'klasifikasi' => 'Klasifikasi', 'jenis' => 'Jenis Penugasan'][$s['kode']] }}</x-ui.th>
+                                    @foreach ($s['kolom'] as $j => $k)
+                                        <x-ui.th :numeric="! ($s['kode'] === 'dana' && $j === 1)">{{ $k }}</x-ui.th>
                                     @endforeach
                                 </x-slot:head>
                                 @foreach ($t['baris'] as $b)
                                     <tr @class(['font-bold border-t-neutral-300!' => $b['total']])>
-                                        <th scope="row" class="bg-white px-4 text-left text-sm {{ $b['total'] ? 'font-bold' : 'font-medium' }}">{{ $i === 0 ? $b['periode'] : $b['label'] }}</th>
+                                        <th scope="row" class="bg-white px-4 text-left text-sm {{ $b['total'] ? 'font-bold' : 'font-medium' }}">{{ in_array($s['kode'], ['rr', 'dana'], true) ? $b['periode'] : $b['label'] }}</th>
                                         @foreach ($b['sel'] as $j => $n)
                                             @if ($b['lebih'] === $j)
                                                 {{-- Task 6 1.1.4: above 100% = icon + "*" + sr-only text, explained by the footnote under the section. --}}
                                                 <td class="relative text-right whitespace-nowrap">
                                                     <span class="inline-flex items-center gap-1">{{ svg('heroicon-m-exclamation-triangle', 'size-4 shrink-0 text-accent-700') }}{{ number_format($n, 0, ',', '.') }}<span aria-hidden="true">*</span><span class="sr-only">, di atas 100%, lihat catatan</span></span>
                                                 </td>
+                                            @elseif ($s['kode'] === 'dana')
+                                                {{-- 1.3: Dana in Rupiah (right, no wrap), Keterangan "x dari y SPT terisi" as plain text so the total is not read as the full cost. --}}
+                                                <td @class(['text-right whitespace-nowrap tabular-nums' => $j === 0])>{{ $j === 0 ? \App\Support\Rupiah::format($n) : $n }}</td>
                                             @else
                                                 <td class="text-right">{{ is_int($n) ? number_format($n, 0, ',', '.') : $n }}</td>
                                             @endif
@@ -193,7 +196,7 @@
                 <fieldset>
                     <legend class="mb-1 text-sm font-semibold text-neutral-900">Ringkasan</legend>
                     <div class="flex flex-col">
-                        @foreach (['rr' => 'Rencana vs Realisasi', 'klasifikasi' => 'Per Klasifikasi', 'jenis' => 'Per Jenis Penugasan'] as $kode => $teks)
+                        @foreach (['rr' => 'Rencana vs Realisasi', 'klasifikasi' => 'Per Klasifikasi', 'jenis' => 'Per Jenis Penugasan', 'dana' => 'Realisasi Dana'] as $kode => $teks)
                             <x-ui.checkbox :label="$teks" name="bagianEkspor[]" id="ekspor-{{ $kode }}" :value="$kode" wire:model="bagianEkspor" :autofocus="$loop->first" />
                         @endforeach
                     </div>

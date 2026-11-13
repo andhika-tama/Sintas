@@ -57,7 +57,7 @@ class MonitoringSpt
      * Groups (items by effective start, then id; "Di luar PKPT" last; only groups with rows):
      *   {item_id: ?int, label: string, jenis: ?{id, nama, warna, warna_teks}, mulai: ?CarbonImmutable, selesai: ?CarbonImmutable, irban: ?string, spt: list<row>}
      * Row: {id, nomor_lengkap, tanggal_spt: ?CarbonImmutable, irban: string, jenis: ?{id, nama, warna, warna_teks}, mulai, selesai, kesesuaian: sesuai|tidak_sesuai|non_pkpt,
-     *   status: StatusSpt, penanda: list<string>, tim: string, ppj: ?string, kendala: ?{kategori, uraian}, url}
+     *   status: StatusSpt, penanda: list<string>, tim: string, ppj: ?string, dana: ?int, kendala: ?{kategori, uraian}, url}
      */
     public function baris(array $filter): array
     {
@@ -206,6 +206,7 @@ class MonitoringSpt
             'penanda' => $flags,
             'tim' => $this->namaTim($spt),
             'ppj' => $spt->ppj?->nama_bergelar,
+            'dana' => $spt->realisasi_dana,
             'kendala' => $spt->kendala ? ['kategori' => $spt->kendala->kategori, 'uraian' => $spt->kendala->uraian] : null,
             'url' => route('spt.show', $spt->id),
         ];

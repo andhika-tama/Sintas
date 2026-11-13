@@ -133,7 +133,7 @@ class HalamanRekapTest extends TestCase
     public function test_export_xlsx_equals_the_page_numbers(): void
     {
         $r = app(Ekspor::class)->minta($this->pimpinan, 'rekap', 'xlsx', ['tahun' => '2026']);
-        $this->assertStringContainsString('rekap-triwulan-2026-rr-klasifikasi-jenis.xlsx', $r->headers->get('content-disposition'));
+        $this->assertStringContainsString('rekap-triwulan-2026-rr-klasifikasi-jenis-dana.xlsx', $r->headers->get('content-disposition'));
         $rows = $this->rowsXlsx($r);
 
         foreach (['Rencana vs Realisasi', 'Per Klasifikasi', 'Per Jenis Penugasan', 'Irban Periode Rencana Realisasi %', 'TW II 3 2 67', 'Gabungan Total 9 4 44', 'REGULER Setahun 6 2 4', 'Jenis Satu Setahun 6 2 33 5', 'Total Setahun 9 4 44 8'] as $needle) {
@@ -141,7 +141,7 @@ class HalamanRekapTest extends TestCase
         }
         $this->assertTrue(collect($rows)->contains('Irban A Total 6 3 50'));
         $this->assertTrue(collect($rows)->contains('Irban B Total 3 1 33'));
-        $this->halaman($this->pimpinan, ['irban' => (string) $this->a->id])->call('bukaEkspor', 'xlsx')->call('unduhEkspor')->assertFileDownloaded('rekap-triwulan-2026-irban-'.$this->a->kode_nomor.'-rr-klasifikasi-jenis.xlsx');
+        $this->halaman($this->pimpinan, ['irban' => (string) $this->a->id])->call('bukaEkspor', 'xlsx')->call('unduhEkspor')->assertFileDownloaded('rekap-triwulan-2026-irban-'.$this->a->kode_nomor.'-rr-klasifikasi-jenis-dana.xlsx');
     }
 
     /** PRD §14 butir 6: for tw=1 every numeric row the page shows (Per Irban and Gabungan tabs) is in the xlsx for the same filter. */
@@ -169,7 +169,7 @@ class HalamanRekapTest extends TestCase
     public function test_export_pdf(): void
     {
         $r = TestResponse::fromBaseResponse(app(Ekspor::class)->minta($this->pimpinan, 'rekap', 'pdf', ['tahun' => '2026']));
-        $r->assertDownload('rekap-triwulan-2026-rr-klasifikasi-jenis.pdf');
+        $r->assertDownload('rekap-triwulan-2026-rr-klasifikasi-jenis-dana.pdf');
         $this->assertStringStartsWith('%PDF', $r->streamedContent());
 
         $p = app(PembangunRekap::class);
@@ -183,8 +183,8 @@ class HalamanRekapTest extends TestCase
     {
         $p = app(PembangunRekap::class);
         $f = $p->filter($this->irbanA, ['tahun' => '2026', 'irban' => (string) $this->b->id]);
-        $this->assertSame(['tahun' => 2026, 'tw' => 0, 'irban' => $this->a->id, 'bagian' => ['rr', 'klasifikasi', 'jenis'], 'saring' => ['klasifikasi' => null, 'kode_arsip' => null, 'jenis' => null]], $f);
-        $this->assertSame('rekap-triwulan-2026-irban-'.$this->a->kode_nomor.'-rr-klasifikasi-jenis', $p->namaFile($this->irbanA, $f));
+        $this->assertSame(['tahun' => 2026, 'tw' => 0, 'irban' => $this->a->id, 'bagian' => ['rr', 'klasifikasi', 'jenis', 'dana'], 'saring' => ['klasifikasi' => null, 'kode_arsip' => null, 'jenis' => null]], $f);
+        $this->assertSame('rekap-triwulan-2026-irban-'.$this->a->kode_nomor.'-rr-klasifikasi-jenis-dana', $p->namaFile($this->irbanA, $f));
 
         $r = app(Ekspor::class)->minta($this->irbanA, 'rekap', 'xlsx', ['irban' => (string) $this->b->id]);
         $text = json_encode(IOFactory::load($r->getFile()->getPathname())->getActiveSheet()->toArray());
@@ -196,7 +196,7 @@ class HalamanRekapTest extends TestCase
     public function test_builder_validates_and_authorizes(): void
     {
         $p = app(PembangunRekap::class);
-        $this->assertSame(['tahun' => 2026, 'tw' => 0, 'irban' => null, 'bagian' => ['rr', 'klasifikasi', 'jenis'], 'saring' => ['klasifikasi' => null, 'kode_arsip' => null, 'jenis' => null]],
+        $this->assertSame(['tahun' => 2026, 'tw' => 0, 'irban' => null, 'bagian' => ['rr', 'klasifikasi', 'jenis', 'dana'], 'saring' => ['klasifikasi' => null, 'kode_arsip' => null, 'jenis' => null]],
             $p->filter($this->pimpinan, ['tahun' => 'abc', 'tw' => '7', 'irban' => '999', 'klasifikasi' => '99999', 'jenis' => 'x']));
         $this->assertSame('/pimpinan/rekap', $p->halaman($this->pimpinan));
 
@@ -206,7 +206,7 @@ class HalamanRekapTest extends TestCase
 
     public function test_export_modal_defaults_per_tab_and_validates(): void
     {
-        foreach (['irban' => ['rr', 'klasifikasi', 'jenis'], 'gabungan' => ['rr', 'klasifikasi', 'jenis'], 'detail' => ['detail']] as $tab => $bagian) {
+        foreach (['irban' => ['rr', 'klasifikasi', 'jenis', 'dana'], 'gabungan' => ['rr', 'klasifikasi', 'jenis', 'dana'], 'detail' => ['detail']] as $tab => $bagian) {
             $this->halaman($this->pimpinan, ['tab' => $tab])->call('bukaEkspor', 'pdf')
                 ->assertSet('bagianEkspor', $bagian)->assertSet('formatEkspor', 'pdf')->assertSet('pilihEkspor', true);
         }
@@ -223,10 +223,23 @@ class HalamanRekapTest extends TestCase
         $this->halaman($this->pimpinan)->call('bukaEkspor', 'csv')->assertSet('pilihEkspor', false)->assertSet('formatEkspor', '');
     }
 
+    /** 1.3 Task 4: the Realisasi Dana section on screen (Rupiah, "x dari y SPT terisi", no chart), scoped by irban; the export modal offers it. */
+    public function test_realisasi_dana_section_on_screen_and_in_the_export_choice(): void
+    {
+        Spt::whereDate('tanggal_mulai', '2026-02-01')->where('irban_id', $this->a->id)->update(['realisasi_dana' => 600000]);
+
+        $this->halaman($this->pimpinan, ['tab' => 'gabungan'])->assertSee('Realisasi Dana')->assertSeeInOrder(['Triwulan', 'Dana', 'Keterangan'])
+            ->assertSee('Rp600.000')->assertSee('1 dari 8 SPT terisi')->assertSee('Realisasi Dana', false)
+            ->call('bukaEkspor', 'xlsx')->assertSeeHtml('id="ekspor-dana"');
+
+        $this->halaman($this->irbanA)->assertSee('Rp600.000')->assertSee('1 dari 5 SPT terisi')->assertDontSee('Irban B');
+        $this->halaman($this->pimpinan, ['tab' => 'detail'])->assertDontSee('SPT terisi');
+    }
+
     public function test_export_modal_default_for_irban_is_the_irban_sections(): void
     {
         $this->halaman($this->irbanA)->call('bukaEkspor', 'pdf')
-            ->assertSet('bagianEkspor', ['rr', 'klasifikasi', 'jenis'])->assertSet('formatEkspor', 'pdf')->assertSet('pilihEkspor', true);
+            ->assertSet('bagianEkspor', ['rr', 'klasifikasi', 'jenis', 'dana'])->assertSet('formatEkspor', 'pdf')->assertSet('pilihEkspor', true);
     }
 
     public function test_export_modal_requires_rekap_access(): void
@@ -358,7 +371,7 @@ class HalamanRekapTest extends TestCase
     public function test_ekspor_dari_halaman_membawa_saring(): void
     {
         $t = $this->halaman($this->pimpinan, ['klasifikasi' => (string) $this->k, 'jenis' => (string) $this->j2->id]);
-        $t->call('bukaEkspor', 'xlsx')->call('unduhEkspor')->assertFileDownloaded('rekap-triwulan-2026-klasifikasi-khusus-jenis-jenis-dua-rr-klasifikasi-jenis.xlsx');
+        $t->call('bukaEkspor', 'xlsx')->call('unduhEkspor')->assertFileDownloaded('rekap-triwulan-2026-klasifikasi-khusus-jenis-jenis-dua-rr-klasifikasi-jenis-dana.xlsx');
 
         $r = app(Ekspor::class)->minta($this->pimpinan, 'rekap', 'xlsx', ['tahun' => '2026', 'klasifikasi' => (string) $this->k, 'jenis' => (string) $this->j2->id]);
         $rows = $this->rowsXlsx($r);

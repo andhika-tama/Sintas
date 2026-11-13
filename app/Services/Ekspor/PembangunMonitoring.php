@@ -8,13 +8,14 @@ use App\Models\Spt;
 use App\Models\User;
 use App\Services\MonitoringSpt;
 use App\Services\SaringSpt;
+use App\Support\Rupiah;
 use App\Support\Tanggal;
 use Illuminate\Support\Facades\Gate;
 
 /** Monitoring SPT export (pimpinan.md "Monitoring table"): one row per SPT, group label in Jenis Penugasan. Rows come from MonitoringSpt::baris(). */
 class PembangunMonitoring implements Pembangun
 {
-    public const KOLOM = ['Nomor SPT', 'Irban', 'Tim · PPJ', 'Jenis Penugasan', 'Periode Penugasan (PKPT)', 'Realisasi Periode', 'Kesesuaian dengan Jadwal PKPT', 'Status', 'Permasalahan/Kendala'];
+    public const KOLOM = ['Nomor SPT', 'Irban', 'Tim · PPJ', 'Jenis Penugasan', 'Periode Penugasan (PKPT)', 'Realisasi Periode', 'Kesesuaian dengan Jadwal PKPT', 'Status', 'Realisasi Dana', 'Permasalahan/Kendala'];
 
     /** Labels of the MonitoringSpt::STATUS filter values (page select, PDF filter summary). */
     public const STATUS = ['berjalan' => 'Berjalan', 'selesai' => 'Selesai', 'siap_dilaksanakan' => 'Siap Dilaksanakan', 'pelaksanaan' => 'Pelaksanaan', 'penyusunan_laporan' => 'Penyusunan Laporan'];
@@ -77,7 +78,7 @@ class PembangunMonitoring implements Pembangun
         return $r['status']->label().(in_array('terlambat', $r['penanda'], true) ? ', Terlambat' : '');
     }
 
-    /** @return list<list<?string>> */
+    /** @return list<list<int|string|null>> `Realisasi Dana` is an int (null = empty cell) in the file; the PDF view formats it. */
     private function baris(array $filter, bool $untukPdf = false): array
     {
         $out = [];
@@ -87,7 +88,7 @@ class PembangunMonitoring implements Pembangun
                 $out[] = [
                     $r['nomor_lengkap'], $untukPdf ? [$r['irban'], MonitoringSpt::timPpj($r, true)] : $r['irban'], ...($untukPdf ? [] : [MonitoringSpt::timPpj($r)]), $g['label'], $pkpt,
                     $r['mulai'] && $r['selesai'] ? Tanggal::rentang($r['mulai'], $r['selesai']) : '–',
-                    self::KESESUAIAN[$r['kesesuaian']], self::labelStatus($r),
+                    self::KESESUAIAN[$r['kesesuaian']], self::labelStatus($r), $untukPdf ? Rupiah::format($r['dana']) : $r['dana'],
                     $r['kendala'] ? "{$r['kendala']['kategori']}: {$r['kendala']['uraian']}" : null,
                 ];
             }

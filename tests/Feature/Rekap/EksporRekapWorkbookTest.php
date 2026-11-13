@@ -78,18 +78,83 @@ class EksporRekapWorkbookTest extends TestCase
     public function test_bagian_terpilih_whitelists_orders_and_defaults(): void
     {
         $this->assertSame(['rr', 'jenis', 'detail'], PembangunRekap::bagianTerpilih(['detail', 'x', 'rr', 'jenis', 'rr', ['rr']]));
-        $this->assertSame(['rr', 'klasifikasi', 'jenis'], PembangunRekap::bagianTerpilih([]));
-        $this->assertSame(['rr', 'klasifikasi', 'jenis'], PembangunRekap::bagianTerpilih(['nope']));
-        $this->assertSame(['rr', 'klasifikasi', 'jenis'], PembangunRekap::bagianTerpilih(null));
+        $this->assertSame(['rr', 'klasifikasi', 'jenis', 'dana'], PembangunRekap::bagianTerpilih([]));
+        $this->assertSame(['rr', 'klasifikasi', 'jenis', 'dana'], PembangunRekap::bagianTerpilih(['nope']));
+        $this->assertSame(['rr', 'klasifikasi', 'jenis', 'dana'], PembangunRekap::bagianTerpilih(null));
         $this->assertSame(['detail'], PembangunRekap::bagianTerpilih('detail'));
         $this->assertSame(['detail'], PembangunRekap::BAGIAN_DEFAULT['detail']);
+    }
+
+    /** 1.3 Task 4: `dana` is a known section code, ordered before `detail`, and preselected on the irban and gabungan tabs only. */
+    public function test_dana_is_a_section_code_in_the_export_choice(): void
+    {
+        $this->assertSame(['rr', 'dana', 'detail'], PembangunRekap::bagianTerpilih(['detail', 'dana', 'rr']));
+        $this->assertContains('dana', PembangunRekap::BAGIAN_DEFAULT['irban']);
+        $this->assertContains('dana', PembangunRekap::BAGIAN_DEFAULT['gabungan']);
+        $this->assertNotContains('dana', PembangunRekap::BAGIAN_DEFAULT['detail']);
+        $this->assertSame('rekap-triwulan-2026-dana', app(PembangunRekap::class)->namaFile($this->pimpinan, app(PembangunRekap::class)->filter($this->pimpinan, ['tahun' => 2026, 'bagian' => ['dana']])));
+    }
+
+    /** Filled like RekapTriwulanTest::isiDana (subset): A TW I 600000 + 1 unfilled, A TW IV 100000, B TW II 250000. */
+    private function isiDana(): void
+    {
+        $dana = fn (string $mulai, Irban $i, ?int $v) => Spt::where('irban_id', $i->id)->whereDate('tanggal_mulai', $mulai)->update(['realisasi_dana' => $v]);
+        $dana('2026-02-01', $this->a, 600000);
+        $dana('2026-10-05', $this->a, 100000);
+        $dana('2026-06-01', $this->b, 250000);
+        $dana('2026-06-20', $this->b, 999); // dibatalkan: never counted
+    }
+
+    public function test_dana_section_is_numeric_with_rupiah_format_in_the_workbook(): void
+    {
+        $this->isiDana();
+        $buku = $this->buku($this->pimpinan, ['bagian' => ['dana']]);
+
+        $a = $buku->getSheetByName('Irban A');
+        $this->assertContains('Realisasi Dana', $this->teks($a));
+        $kepala = array_search('Realisasi Dana', array_column($a->toArray(null, true, false, false), 0), true) + 2; // header row (1-based)
+        $this->assertSame(['Irban', 'Periode', 'Dana', 'Keterangan'], array_slice($a->toArray(null, true, false, false)[$kepala - 1], 0, 4));
+
+        $total = $this->baris($a, 'Irban A', 'Total');
+        $this->assertSame(['Irban A', 'Total', 700000, '2 dari 5 SPT terisi'], array_slice($total, 0, 4));
+        $this->assertSame(['Irban A', 'TW I', 600000, '1 dari 2 SPT terisi'], array_slice($this->baris($a, 'Irban A', 'TW I'), 0, 4));
+        $this->assertSame(['Irban A', 'TW III', 0, '0 dari 0 SPT terisi'], array_slice($this->baris($a, 'Irban A', 'TW III'), 0, 4));
+
+        // The cells are numbers with the Rupiah format, not text.
+        $r = $kepala + 1;
+        $this->assertSame('TW I', $a->getCell("B{$r}")->getValue());
+        $this->assertSame(DataType::TYPE_NUMERIC, $a->getCell("C{$r}")->getDataType());
+        $this->assertSame('"Rp"#,##0', $a->getStyle("C{$r}")->getNumberFormat()->getFormatCode());
+        $this->assertSame(DataType::TYPE_STRING, $a->getCell("D{$r}")->getDataType());
+        $this->assertSame('General', $a->getStyle("D{$r}")->getNumberFormat()->getFormatCode());
+
+        // Gabungan sums both irban; Irban B excludes the dibatalkan SPT (999).
+        $g = $buku->getSheetByName('Gabungan');
+        $this->assertSame(['Gabungan', 'Total', 950000, '3 dari 8 SPT terisi'], array_slice($this->baris($g, 'Gabungan', 'Total'), 0, 4));
+        $this->assertSame(250000, $this->baris($buku->getSheetByName('Irban B'), 'Irban B', 'Total')[2]);
+    }
+
+    public function test_dana_follows_the_filter_and_pdf_formats_rupiah(): void
+    {
+        $this->isiDana();
+        $p = app(PembangunRekap::class);
+        $khusus = $this->buku($this->pimpinan, ['bagian' => ['dana'], 'klasifikasi' => (string) $this->k])->getSheetByName('Gabungan');
+        $this->assertSame(['Gabungan', 'Total', 0, '0 dari 2 SPT terisi'], array_slice($this->baris($khusus, 'Gabungan', 'Total'), 0, 4));
+
+        $html = $p->html($this->pimpinan, $p->filter($this->pimpinan, ['tahun' => 2026, 'bagian' => ['dana']]));
+        $this->assertStringContainsString('<h2>Realisasi Dana</h2>', $html);
+        $this->assertStringContainsString('Rp700.000', $html);
+        $this->assertStringContainsString('2 dari 5 SPT terisi', $html);
+        $this->assertStringNotContainsString('Rencana vs Realisasi', $html);
+        $this->assertStringNotContainsString('<svg', $html); // no chart for dana
+        $this->assertSame([], $p->grafik(app(RekapTriwulan::class)->hitung(2026), ['tw' => 0, 'irban' => null, 'bagian' => ['dana']]));
     }
 
     public function test_file_name_suffix_only_when_not_all_sections(): void
     {
         $p = app(PembangunRekap::class);
         $nama = fn (array $f) => $p->namaFile($this->pimpinan, $p->filter($this->pimpinan, ['tahun' => 2026, ...$f]));
-        $this->assertSame('rekap-triwulan-2026', $nama(['bagian' => ['detail', 'jenis', 'klasifikasi', 'rr']]));
+        $this->assertSame('rekap-triwulan-2026', $nama(['bagian' => ['detail', 'dana', 'jenis', 'klasifikasi', 'rr']]));
         $this->assertSame('rekap-triwulan-2026-rr-detail', $nama(['bagian' => ['detail', 'rr']]));
         $this->assertSame('rekap-triwulan-2026-irban-'.$this->a->kode_nomor.'-klasifikasi', $nama(['irban' => $this->a->id, 'bagian' => ['klasifikasi']]));
     }
@@ -377,6 +442,8 @@ class EksporRekapWorkbookTest extends TestCase
         foreach ($s->getRowIterator() as $row) {
             if ($s->getCell('A'.$row->getRowIndex())->getValue() === 'Gabungan' && $s->getCell('B'.$row->getRowIndex())->getValue() === 'Total') {
                 $this->assertSame(DataType::TYPE_STRING, $s->getCell('C'.$row->getRowIndex())->getDataType());
+
+                break; // the first Gabungan/Total row is Rencana vs Realisasi; the Realisasi Dana one holds a number
             }
         }
         $teks = $this->teks($s);
@@ -406,7 +473,7 @@ class EksporRekapWorkbookTest extends TestCase
         $p = app(PembangunRekap::class);
         $kode = KodeArsip::where('kode', '700')->value('id');
         $nama = fn (array $f) => $p->namaFile($this->pimpinan, $p->filter($this->pimpinan, ['tahun' => 2026, ...$f]));
-        $this->assertSame('rekap-triwulan-2026-rr-klasifikasi-jenis', $nama([]));
+        $this->assertSame('rekap-triwulan-2026-rr-klasifikasi-jenis-dana', $nama([]));
         $this->assertSame('rekap-triwulan-2026-klasifikasi-reguler-kode-arsip-700-pengawasan-umum-jenis-lainnya-rr', $nama(['klasifikasi' => $this->r, 'kode_arsip' => $kode, 'jenis' => 'lainnya', 'bagian' => ['rr']]));
         $this->assertSame('rekap-triwulan-2026-jenis-jenis-satu', $nama(['jenis' => (string) $this->j1->id, 'klasifikasi' => '99999', 'bagian' => PembangunRekap::BAGIAN]));
     }

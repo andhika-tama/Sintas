@@ -33,6 +33,7 @@ class RekapTriwulan
      *   klasifikasi: {baris: list<{id, nama, tw, total}>, total: {tw, total}}              cells {jumlah, berjalan, selesai}
      *   jenis:       {baris: list<{id: ?int, nama, tw, total}>, total: {tw, total}}        cells {rencana, realisasi, persen, jumlah}
      * Totals rows are sums over the rows with `persen` recomputed from the summed numbers.
+     *   dana:        {baris: list<{id, nama, kode_nomor, tw, total}>, total: {tw, total}}  cells {dana, terisi, jumlah}: Σ realisasi_dana, SPT with a value, SPT in the quarter
      *   rencana: {tampil: bool, catatan: ?string} (aturanRencana); when tampil is false every `rencana` and `persen` cell is null.
      * $saring (Klasifikasi / Kode Arsip / Jenis, re-validated here by SaringSpt::dari) filters the SPT of every section;
      * the items behind Rencana are filtered by jenis only (PkptItem::scopeSaring).
@@ -52,6 +53,8 @@ class RekapTriwulan
         $perIrban = $kosong($irban, $rr);
         $perKlasifikasi = $kosong($klasifikasi, $kl);
         $perJenis = $kosong($jenis, $jn);
+        $dn = ['dana' => 0, 'terisi' => 0, 'jumlah' => 0];
+        $perDana = $kosong($irban, $dn);
         // Key 0 = "Tanpa jenis penugasan": SPT without a jenis, and any jenis id missing from the list above (created meanwhile).
         $perJenis[0] = array_fill(1, 4, $jn);
         $perJenis[-1] = array_fill(1, 4, $jn); // SPT with a free-text jenis (Lainnya): one group for all values
@@ -94,6 +97,13 @@ class RekapTriwulan
             $k = $spt->jenis_penugasan_id === null && $spt->jenis_penugasan_lainnya !== null ? -1 : $kunciJenis($spt->jenis_penugasan_id);
             $perJenis[$k][$tw]['realisasi'] += $realisasi;
             $perJenis[$k][$tw]['jumlah']++;
+            if (isset($perDana[$spt->irban_id])) {
+                $perDana[$spt->irban_id][$tw]['jumlah']++;
+                if ($spt->realisasi_dana !== null) {
+                    $perDana[$spt->irban_id][$tw]['terisi']++;
+                    $perDana[$spt->irban_id][$tw]['dana'] += $spt->realisasi_dana;
+                }
+            }
         }
 
         $barisJenis = $jenis->map(fn ($j) => ['id' => $j->id, 'nama' => $j->nama, ...$this->tabel($perJenis[$j->id])])->all();
@@ -110,6 +120,7 @@ class RekapTriwulan
             'irban' => $this->denganTotal($irban->map(fn ($i) => ['id' => $i->id, 'nama' => $i->nama, 'kode_nomor' => $i->kode_nomor, ...$this->tabel($perIrban[$i->id])])->all(), $rr),
             'klasifikasi' => $this->denganTotal($klasifikasi->map(fn ($k) => ['id' => $k->id, 'nama' => $k->nama, ...$this->tabel($perKlasifikasi[$k->id])])->all(), $kl),
             'jenis' => $this->denganTotal($barisJenis, $jn),
+            'dana' => $this->denganTotal($irban->map(fn ($i) => ['id' => $i->id, 'nama' => $i->nama, 'kode_nomor' => $i->kode_nomor, ...$this->tabel($perDana[$i->id])])->all(), $dn),
             'rencana' => $aturan,
         ];
         if (! $aturan['tampil']) {

@@ -26,20 +26,23 @@ class PembangunRekap implements Pembangun
 {
     public const TW = [1 => 'TW I', 2 => 'TW II', 3 => 'TW III', 4 => 'TW IV'];
 
-    /** Section codes in canonical order: Rencana vs Realisasi, Per Klasifikasi, Per Jenis Penugasan, Detail Realisasi. */
-    public const BAGIAN = ['rr', 'klasifikasi', 'jenis', 'detail'];
+    /** Section codes in canonical order: Rencana vs Realisasi, Per Klasifikasi, Per Jenis Penugasan, Realisasi Dana, Detail Realisasi. */
+    public const BAGIAN = ['rr', 'klasifikasi', 'jenis', 'dana', 'detail'];
 
     /** Preselected sections per Rekap tab. */
-    public const BAGIAN_DEFAULT = ['irban' => ['rr', 'klasifikasi', 'jenis'], 'gabungan' => ['rr', 'klasifikasi', 'jenis'], 'detail' => ['detail']];
+    public const BAGIAN_DEFAULT = ['irban' => ['rr', 'klasifikasi', 'jenis', 'dana'], 'gabungan' => ['rr', 'klasifikasi', 'jenis', 'dana'], 'detail' => ['detail']];
 
     /** First column header of each summary section in the workbook. */
-    private const KEPALA = ['rr' => 'Irban', 'klasifikasi' => 'Klasifikasi', 'jenis' => 'Jenis Penugasan'];
+    private const KEPALA = ['rr' => 'Irban', 'klasifikasi' => 'Klasifikasi', 'jenis' => 'Jenis Penugasan', 'dana' => 'Irban'];
 
     private const RR = [['Rencana', 'Realisasi', '%'], ['rencana', 'realisasi', 'persen']];
 
     private const KL = [['Jumlah', 'Berjalan', 'Selesai'], ['jumlah', 'berjalan', 'selesai']];
 
     private const JN = [['Rencana', 'Realisasi', '%', 'Jumlah SPT'], ['rencana', 'realisasi', 'persen', 'jumlah']];
+
+    /** Realisasi Dana (1.3): Dana in Rupiah (a number in the files), Keterangan "x dari y SPT terisi" so the total is not read as the full cost. */
+    private const DN = [['Dana', 'Keterangan'], ['dana', 'keterangan']];
 
     private const DETAIL = 'Detail Realisasi per Item PKPT';
 
@@ -188,7 +191,7 @@ class PembangunRekap implements Pembangun
             }
             $baris = $s['tabel'][0]['baris'];
             $lebih = $lebih || (bool) array_filter(array_column($baris, 'lebih'), 'is_int');
-            $hasil[] = ['judul' => $s['judul'], 'kolom' => [self::KEPALA[$s['kode']], 'Periode', ...$s['kolom']], 'tipe' => ['label', 'teks', ...array_fill(0, count($s['kolom']), 'angka')],
+            $hasil[] = ['judul' => $s['judul'], 'kolom' => [self::KEPALA[$s['kode']], 'Periode', ...$s['kolom']], 'tipe' => ['label', 'teks', ...($s['kode'] === 'dana' ? ['rupiah', 'teks'] : array_fill(0, count($s['kolom']), 'angka'))],
                 'baris' => array_map(fn ($b) => [$b['label'], $b['periode'], ...$tanda($b)], $baris), 'total' => array_keys(array_filter(array_column($baris, 'total')))];
             if ($s['kode'] === 'rr' && $gabungan) {
                 $sel = fn (array $b) => $filter['tw'] ? $b['tw'][$filter['tw']] : $b['total'];
@@ -346,7 +349,26 @@ class PembangunRekap implements Pembangun
             ['kode' => 'rr', 'judul' => 'Rencana vs Realisasi', 'kolom' => self::RR[0], 'tabel' => $tabel],
             ['kode' => 'klasifikasi', 'judul' => 'Per Klasifikasi', 'kolom' => self::KL[0], 'tabel' => [['judul' => null, 'baris' => $this->barisNama($rekap['klasifikasi'], self::KL[1], $tw)]]],
             ['kode' => 'jenis', 'judul' => 'Per Jenis Penugasan', 'kolom' => self::JN[0], 'tabel' => [['judul' => null, 'baris' => $this->barisNama($rekap['jenis'], self::JN[1], $tw)]]],
+            ['kode' => 'dana', 'judul' => 'Realisasi Dana', 'kolom' => self::DN[0], 'tabel' => $this->tabelDana($rekap['dana'], $tw, $tab)],
         ];
+    }
+
+    /** One table per irban (tab irban / semua) and the summed one (gabungan / semua), like Rencana vs Realisasi; Dana stays an int, `keterangan` is added per cell. */
+    private function tabelDana(array $dana, int $tw, string $tab): array
+    {
+        $ket = fn (array $b) => ['tw' => array_map(fn ($c) => $c + ['keterangan' => "{$c['terisi']} dari {$c['jumlah']} SPT terisi"], $b['tw']),
+            'total' => $b['total'] + ['keterangan' => "{$b['total']['terisi']} dari {$b['total']['jumlah']} SPT terisi"]] + $b;
+        $tabel = [];
+        if ($tab !== 'gabungan') {
+            foreach ($dana['baris'] as $b) {
+                $tabel[] = ['judul' => $b['nama'], 'baris' => $this->barisTw($ket($b), self::DN[1], $tw)];
+            }
+        }
+        if ($tab === 'gabungan' || ($tab === 'semua' && count($dana['baris']) > 1)) {
+            $tabel[] = ['judul' => $tab === 'gabungan' ? null : 'Gabungan', 'baris' => $this->barisTw($ket($dana['total']), self::DN[1], $tw)];
+        }
+
+        return $tabel;
     }
 
     private function barisTw(array $b, array $kunci, int $tw): array

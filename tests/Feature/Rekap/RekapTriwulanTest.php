@@ -240,7 +240,7 @@ class RekapTriwulanTest extends TestCase
         $this->assertSame(['rencana' => 2, 'realisasi' => 1, 'persen' => 50, 'jumlah' => 1], $tanpa['tw'][2]);
     }
 
-    /** 1.3 Task 2: with no filter the output (minus the new `rencana` key) equals the pre-1.3 output, captured in the snapshot file. */
+    /** 1.3 Task 2: with no filter the output (minus the new `rencana` and `dana` keys) equals the pre-1.3 output, captured in the snapshot file. */
     public function test_tanpa_filter_sama_dengan_sebelum_1_3(): void
     {
         $tanpaId = function (array $a) use (&$tanpaId) {
@@ -254,7 +254,7 @@ class RekapTriwulanTest extends TestCase
         foreach ([$semua, $irbanB] as $r) {
             $this->assertSame(['tampil' => true, 'catatan' => null], $r['rencana']);
         }
-        unset($semua['rencana'], $irbanB['rencana']);
+        unset($semua['rencana'], $irbanB['rencana'], $semua['dana'], $irbanB['dana']); // 1.3 Task 4 added dana; the other sections stay as before
         $this->assertSame($snap['semua'], json_decode(json_encode($tanpaId($semua)), true));
         $this->assertSame($snap['irban_b'], json_decode(json_encode($tanpaId($irbanB)), true));
     }
@@ -399,5 +399,64 @@ class RekapTriwulanTest extends TestCase
         $rekap = app(RekapTriwulan::class)->hitung(2026, null, ['klasifikasi' => '99999', 'kode_arsip' => 'x', 'jenis' => '-1']);
         $this->assertSame(['tampil' => true, 'catatan' => null], $rekap['rencana']);
         $this->assertSame($this->rr([[2, 1, 50], [3, 2, 67], [1, 0, 0], [3, 1, 33]], [9, 4, 44]), $rekap['irban']['total']);
+    }
+
+    /** 1.3 Task 4: dana per irban per TW with terisi/jumlah; dibatalkan, ditolak and other-year SPT never count. */
+    private function isiDana(): void
+    {
+        $dana = fn (string $mulai, int $irban, ?int $v) => Spt::where('irban_id', $irban)->whereDate('tanggal_mulai', $mulai)->update(['realisasi_dana' => $v]);
+        $dana('2026-02-01', $this->a->id, 600000);
+        $dana('2026-03-25', $this->a->id, null);
+        $dana('2026-03-28', $this->a->id, 0);
+        $dana('2026-05-05', $this->a->id, 400000);
+        $dana('2026-10-05', $this->a->id, 100000);
+        $dana('2026-06-01', $this->b->id, 250000);
+        $dana('2026-06-20', $this->b->id, 999); // dibatalkan
+        $dana('2026-09-01', $this->b->id, 888); // ditolak
+        $dana('2026-08-10', $this->b->id, null);
+        $dana('2026-11-01', $this->b->id, 50000);
+        $dana('2025-12-01', $this->b->id, 777); // basis date in 2025
+    }
+
+    private function dn(array $tw, array $total): array
+    {
+        $sel = fn (array $v) => ['dana' => $v[0], 'terisi' => $v[1], 'jumlah' => $v[2]];
+
+        return ['tw' => [1 => $sel($tw[0]), 2 => $sel($tw[1]), 3 => $sel($tw[2]), 4 => $sel($tw[3])], 'total' => $sel($total)];
+    }
+
+    public function test_dana_per_irban_per_triwulan_dengan_terisi_dan_jumlah(): void
+    {
+        $this->isiDana();
+        $dana = app(RekapTriwulan::class)->hitung(2026)['dana'];
+        $per = $this->sel($dana['baris']);
+
+        $this->assertSame($this->dn([[600000, 1, 2], [400000, 2, 2], [0, 0, 0], [100000, 1, 1]], [1100000, 4, 5]), $per[$this->a->id]);
+        $this->assertSame($this->dn([[0, 0, 0], [250000, 1, 1], [0, 0, 1], [50000, 1, 1]], [300000, 2, 3]), $per[$this->b->id]);
+        $this->assertSame($this->dn([[600000, 1, 2], [650000, 3, 3], [0, 0, 1], [150000, 2, 2]], [1400000, 6, 8]), $dana['total']);
+    }
+
+    public function test_dana_mengikuti_irban_dan_filter(): void
+    {
+        $this->isiDana();
+        $rekap = app(RekapTriwulan::class);
+
+        $satu = $rekap->hitung(2026, $this->b->id)['dana'];
+        $this->assertSame([$this->b->id], array_column($satu['baris'], 'id'));
+        $this->assertSame(300000, $satu['total']['total']['dana']);
+
+        // Klasifikasi KHUSUS: only s4 (A, 400000) and s10 (B, 50000).
+        $khusus = $rekap->hitung(2026, null, ['klasifikasi' => (string) $this->k])['dana'];
+        $this->assertSame(['dana' => 450000, 'terisi' => 2, 'jumlah' => 2], $khusus['total']['total']);
+        $this->assertSame(400000, $this->sel($khusus['baris'])[$this->a->id]['total']['dana']);
+
+        // Jenis J1 (s1, s2, s4, s5, s9): 600000 + 400000 + 100000, 3 of 5 terisi.
+        $j1 = $rekap->hitung(2026, null, ['jenis' => (string) $this->j1->id])['dana'];
+        $this->assertSame(['dana' => 1100000, 'terisi' => 3, 'jumlah' => 5], $j1['total']['total']);
+    }
+
+    public function test_dana_kosong_adalah_nol_dari_nol(): void
+    {
+        $this->assertSame(['dana' => 0, 'terisi' => 0, 'jumlah' => 8], app(RekapTriwulan::class)->hitung(2026)['dana']['total']['total']);
     }
 }

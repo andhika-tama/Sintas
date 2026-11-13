@@ -77,7 +77,7 @@ class MonitoringSheetTest extends TestCase
         $this->assertSame('FFFFFFFF', $h->getFont()->getColor()->getARGB());
         $this->assertSame(Alignment::HORIZONTAL_CENTER, $h->getAlignment()->getHorizontal());
 
-        $tipe = ['nomor', 'teks', 'teks', 'panjang', 'tanggal', 'tanggal', 'teks', 'teks', 'panjang'];
+        $tipe = ['nomor', 'teks', 'teks', 'panjang', 'tanggal', 'tanggal', 'teks', 'teks', 'rupiah', 'panjang'];
         foreach ($tipe as $i => $t) {
             $this->assertEquals(RekapSheet::LEBAR[$t], $s->getColumnDimensionByColumn($i + 1)->getWidth(), 'kolom '.($i + 1));
         }
@@ -86,6 +86,66 @@ class MonitoringSheetTest extends TestCase
         $this->assertSame(PageSetup::ORIENTATION_LANDSCAPE, $s->getPageSetup()->getOrientation());
         $this->assertSame(1, $s->getPageSetup()->getFitToWidth());
         $this->assertSame([4, 4], $s->getPageSetup()->getRowsToRepeatAtTop());
+    }
+
+    /** 1.3 Task 4 (Review Focus 5): Realisasi Dana is a number with the Rupiah format; null is an empty cell, 0 is a real 0. */
+    public function test_realisasi_dana_is_numeric_with_rupiah_format_and_null_stays_empty(): void
+    {
+        foreach ([['A-DANA', 600000, '2026-03-05'], ['B-KOSONG', null, '2026-03-06'], ['C-NOL', 0, '2026-03-07']] as [$nomor, $dana, $mulai]) {
+            $spt = Spt::factory()->selesai()->create(['tanggal_mulai' => $mulai, 'tanggal_selesai' => '2026-03-20', 'nomor_lengkap' => $nomor]);
+            $spt->forceFill(['tahun' => 2026, 'realisasi_dana' => $dana])->save();
+        }
+        $s = $this->baca();
+
+        $this->assertSame('Status', $s->getCell('H4')->getValue());
+        $this->assertSame('Realisasi Dana', $s->getCell('I4')->getValue());
+        $this->assertSame('Permasalahan/Kendala', $s->getCell('J4')->getValue());
+        $this->assertSame(['A-DANA', 'B-KOSONG', 'C-NOL'], [$s->getCell('A5')->getValue(), $s->getCell('A6')->getValue(), $s->getCell('A7')->getValue()]);
+
+        $isi = $s->getCell('I5');
+        $this->assertSame(DataType::TYPE_NUMERIC, $isi->getDataType());
+        $this->assertEquals(600000, $isi->getValue());
+        $this->assertSame('"Rp"#,##0', $s->getStyle('I5')->getNumberFormat()->getFormatCode());
+        $this->assertSame(Alignment::HORIZONTAL_RIGHT, $s->getStyle('I5')->getAlignment()->getHorizontal());
+
+        $this->assertNull($s->getCell('I6')->getValue()); // not filled: empty, not 0
+        $nol = $s->getCell('I7');
+        $this->assertSame(DataType::TYPE_NUMERIC, $nol->getDataType());
+        $this->assertSame(0, (int) $nol->getValue());
+        $this->assertNotNull($nol->getValue());
+    }
+
+    /** The same through the real download path: a queued Ekspor row is written to disk by Ekspor::tulis and read back from the file. */
+    public function test_realisasi_dana_survives_the_queued_export_file(): void
+    {
+        Storage::fake('local');
+        $spt = Spt::factory()->selesai()->create(['tanggal_mulai' => '2026-03-05', 'tanggal_selesai' => '2026-03-20']);
+        $spt->forceFill(['tahun' => 2026, 'realisasi_dana' => 1250000500])->save();
+        $e = EksporModel::create(['user_id' => $this->pimpinan->id, 'jenis' => 'monitoring', 'format' => 'xlsx', 'filter' => ['tahun' => 2026], 'nama_file' => 'm.xlsx', 'status' => 'menunggu']);
+        app(Ekspor::class)->tulis($e);
+        $s = IOFactory::load(Storage::disk('local')->path($e->fresh()->path))->getActiveSheet();
+
+        $this->assertSame(DataType::TYPE_NUMERIC, $s->getCell('I5')->getDataType());
+        $this->assertEquals(1250000500, $s->getCell('I5')->getValue());
+        $this->assertSame('"Rp"#,##0', $s->getStyle('I5')->getNumberFormat()->getFormatCode());
+    }
+
+    /** The PDF puts Tim · PPJ under the Irban and shows Realisasi Dana as text (Rp600.000, Rp0, –). */
+    public function test_realisasi_dana_in_the_pdf(): void
+    {
+        foreach ([['A-DANA', 600000, '2026-03-05'], ['B-KOSONG', null, '2026-03-06'], ['C-NOL', 0, '2026-03-07']] as [$nomor, $dana, $mulai]) {
+            $spt = Spt::factory()->selesai()->create(['tanggal_mulai' => $mulai, 'tanggal_selesai' => '2026-03-20', 'nomor_lengkap' => $nomor]);
+            $spt->forceFill(['tahun' => 2026, 'realisasi_dana' => $dana])->save();
+        }
+        $p = new PembangunMonitoring(app(MonitoringSpt::class));
+        $html = $p->html($this->pimpinan, $p->filter($this->pimpinan, []));
+
+        $this->assertStringContainsString('<th>Realisasi Dana</th>', $html);
+        $this->assertStringNotContainsString('Tim · PPJ', $html);
+        $this->assertSame(9, substr_count(explode('</tr>', $html)[0], '<th>'));
+        $this->assertMatchesRegularExpression('#<td>Selesai</td><td>Rp600\.000</td><td>–</td>#u', $html);
+        $this->assertMatchesRegularExpression('#<td>Selesai</td><td>–</td><td>–</td>#u', $html);
+        $this->assertMatchesRegularExpression('#<td>Selesai</td><td>Rp0</td><td>–</td>#u', $html);
     }
 
     public function test_formula_like_text_is_stored_as_string(): void

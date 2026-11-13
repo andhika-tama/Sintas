@@ -44,6 +44,8 @@ class PrivasiPublikTest extends TestCase
         'MK-SPPD-0042',
         // 1.2: free-text Lainnya jenis/objek of non-PKPT SPT.
         'MK-JENIS-lainnya', 'MK-OBJEK-lainnya',
+        // 1.3: Realisasi Dana never reaches the public pages (raw and formatted).
+        '987654321', '987.654.321', 'Rp987',
     ];
 
     protected function setUp(): void
@@ -56,6 +58,7 @@ class PrivasiPublikTest extends TestCase
             'periode_diperiksa' => 'MK-PERIODE-2025', 'uraian_untuk' => 'MK-URAIAN-pemeriksaan', 'catatan_bagian_umum' => 'MK-CATATAN-bu',
             'nomor_lhp' => 'MK-LHP-900', 'nomor_sppd' => 'MK-SPPD-0042',
             'jenis_penugasan_lainnya' => 'MK-JENIS-lainnya', 'objek_lainnya' => 'MK-OBJEK-lainnya',
+            'realisasi_dana' => 987654321,
         ]);
         DB::table('spt')->where('id', $this->v1->id)->update(['nomor_lengkap' => self::NOMOR]);
         Pegawai::query()->update(['nama_bergelar' => 'MK-PEGAWAI-Budi']);

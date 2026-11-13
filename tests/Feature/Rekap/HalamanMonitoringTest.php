@@ -132,7 +132,7 @@ class HalamanMonitoringTest extends TestCase
         Spt::query()->update(['tanggal_spt' => null]); // no Terbit line without a date
         $this->halaman(['tampilan' => 'spt'])
             ->assertDontSeeHtml('<th scope="rowgroup"')->assertDontSee('Buka semua')->assertSee('Urutkan')
-            ->assertSeeHtmlInOrder(['Nomor SPT', 'Realisasi Periode', 'Kesesuaian dengan Jadwal PKPT', 'Status', 'Permasalahan/Kendala'])
+            ->assertSeeHtmlInOrder(['Nomor SPT', 'Realisasi Periode', 'Kesesuaian dengan Jadwal PKPT', 'Status', 'Realisasi Dana', 'Permasalahan/Kendala'])
             ->assertDontSee('Tanggal SPT')->assertDontSee('Terbit 0')->assertDontSee('Terbit 1')->assertDontSee('Terbit 2')
             ->assertSee('Jenis Satu · Irban A', false);
         // Unfinished first by earliest end (m2 5 Apr, m5 20 Des), then the finished one.
@@ -213,7 +213,7 @@ class HalamanMonitoringTest extends TestCase
     public function test_groups_columns_and_rowgroup_headers(): void
     {
         $this->halaman()
-            ->assertSeeHtmlInOrder(['Jenis Penugasan', 'Periode Penugasan (PKPT)', 'Realisasi Periode', 'Kesesuaian dengan Jadwal PKPT', 'Status', 'Permasalahan/Kendala'])
+            ->assertSeeHtmlInOrder(['Jenis Penugasan', 'Periode Penugasan (PKPT)', 'Realisasi Periode', 'Kesesuaian dengan Jadwal PKPT', 'Status', 'Realisasi Dana', 'Permasalahan/Kendala'])
             ->assertSeeHtmlInOrder(['<th scope="rowgroup"', 'Jenis Satu', '1–31 Maret 2026', '2 SPT', '<th scope="rowgroup"', 'Di luar PKPT', '1 SPT'])
             ->assertSeeHtml('aria-label="Tampilkan SPT Jenis Satu 1–31 Maret 2026"')
             ->assertSeeHtml('aria-label="Tampilkan SPT Di luar PKPT"')
@@ -235,6 +235,24 @@ class HalamanMonitoringTest extends TestCase
             ->assertSeeHtmlInOrder([e($this->m[1]->nomor_lengkap), '5–20 Maret 2026', 'Sesuai', 'Selesai'])
             ->assertSeeHtmlInOrder([e($this->m[2]->nomor_lengkap), '25 Maret – 5 April 2026', 'Tidak Sesuai PKPT', 'Penyusunan Laporan', 'Terlambat', 'Objek tidak siap', 'Objek sedang diaudit BPK', 'Selengkapnya'])
             ->assertSeeHtmlInOrder([e($this->m[5]->nomor_lengkap), '10–20 Desember 2026', 'Non-PKPT', 'Pelaksanaan']);
+    }
+
+    /** 1.3 Task 4: Realisasi Dana in both views and the mobile cards: Rp600.000, Rp0, and "–" when not filled. */
+    public function test_realisasi_dana_in_both_views_and_cards(): void
+    {
+        $this->m[1]->forceFill(['realisasi_dana' => 600000])->save();
+        $this->m[5]->forceFill(['realisasi_dana' => 0])->save();
+
+        foreach ([[], ['tampilan' => 'spt']] as $q) {
+            $html = $this->halaman($q)->assertSee('Realisasi Dana')->html();
+            $this->assertSame(3, substr_count($html, 'Realisasi Dana: ')); // one mobile line per SPT row (m1, m2, m5)
+            $this->assertStringContainsString('Rp600.000', $html);
+            $this->assertStringContainsString('Realisasi Dana: Rp600.000', $html);
+            $this->assertStringContainsString('Realisasi Dana: Rp0', $html);
+            $this->assertStringContainsString('Realisasi Dana: –', $html);
+        }
+        $this->halaman()->assertSeeHtmlInOrder([e($this->m[1]->nomor_lengkap), 'Selesai', 'Rp600.000']);
+        $this->halaman()->assertSeeHtml('colspan="7"');
     }
 
     public function test_each_filter_from_the_url(): void
@@ -315,16 +333,16 @@ class HalamanMonitoringTest extends TestCase
         $r = app(Ekspor::class)->minta($this->pimpinan, 'monitoring', 'xlsx', ['irban' => (string) $this->a->id]);
         $sheet = array_slice(IOFactory::load($r->getFile()->getPathname())->getActiveSheet()->toArray(), 3); // rows 1-3: title, filter, Dibuat
 
-        $this->assertSame(['Nomor SPT', 'Irban', 'Tim · PPJ', 'Jenis Penugasan', 'Periode Penugasan (PKPT)', 'Realisasi Periode', 'Kesesuaian dengan Jadwal PKPT', 'Status', 'Permasalahan/Kendala'], $sheet[0]);
+        $this->assertSame(['Nomor SPT', 'Irban', 'Tim · PPJ', 'Jenis Penugasan', 'Periode Penugasan (PKPT)', 'Realisasi Periode', 'Kesesuaian dengan Jadwal PKPT', 'Status', 'Realisasi Dana', 'Permasalahan/Kendala'], $sheet[0]);
         $this->assertCount(3, $sheet); // m1, m2 (Irban B's m5 and 2025's m9 filtered out)
-        $this->assertSame([$this->m[1]->nomor_lengkap, 'Irban A', 'Tanpa tim · –', 'Jenis Satu', '1–31 Maret 2026', '5–20 Maret 2026', 'Sesuai', 'Selesai', null], $sheet[1]);
-        $this->assertSame([$this->m[2]->nomor_lengkap, 'Irban A', 'Tim 1 · Maleha, S.H', 'Jenis Satu', '1–31 Maret 2026', '25 Maret – 5 April 2026', 'Tidak Sesuai PKPT', 'Penyusunan Laporan, Terlambat',
+        $this->assertSame([$this->m[1]->nomor_lengkap, 'Irban A', 'Tanpa tim · –', 'Jenis Satu', '1–31 Maret 2026', '5–20 Maret 2026', 'Sesuai', 'Selesai', null, null], $sheet[1]);
+        $this->assertSame([$this->m[2]->nomor_lengkap, 'Irban A', 'Tim 1 · Maleha, S.H', 'Jenis Satu', '1–31 Maret 2026', '25 Maret – 5 April 2026', 'Tidak Sesuai PKPT', 'Penyusunan Laporan, Terlambat', null,
             'Objek tidak siap: Objek sedang diaudit BPK sehingga dokumen pendukung belum dapat diserahkan kepada tim pemeriksa sampai akhir bulan.'], $sheet[2]);
 
         $semua = app(Ekspor::class)->minta($this->pimpinan, 'monitoring', 'xlsx', []);
         $this->assertStringContainsString('monitoring-spt-2026.xlsx', $semua->headers->get('content-disposition'));
         $rows = array_slice(IOFactory::load($semua->getFile()->getPathname())->getActiveSheet()->toArray(), 3); // rows 1-3: title, filter, Dibuat
-        $this->assertSame([$this->m[5]->nomor_lengkap, 'Irban B', 'Tanpa tim · –', 'Di luar PKPT', '–', '10–20 Desember 2026', 'Non-PKPT', 'Pelaksanaan', null], $rows[3]);
+        $this->assertSame([$this->m[5]->nomor_lengkap, 'Irban B', 'Tanpa tim · –', 'Di luar PKPT', '–', '10–20 Desember 2026', 'Non-PKPT', 'Pelaksanaan', null, null], $rows[3]);
     }
 
     public function test_tim_ppj_shows_in_both_views_and_in_the_pdf(): void

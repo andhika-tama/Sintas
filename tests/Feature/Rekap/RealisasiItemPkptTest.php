@@ -79,7 +79,7 @@ class RealisasiItemPkptTest extends TestCase
         $this->assertSame($it->id, $tw2['item_id']);
         $this->assertSame([$s->id], array_column($tw2['spt'], 'id'));
         $this->assertSame('tidak_sesuai', $tw2['spt'][0]['kesesuaian']);
-        $this->assertSame(['id', 'nomor_lengkap', 'tanggal_spt', 'irban', 'jenis', 'mulai', 'selesai', 'kesesuaian', 'status', 'penanda', 'tim', 'ppj', 'kendala', 'url'], array_keys($tw2['spt'][0]));
+        $this->assertSame(['id', 'nomor_lengkap', 'tanggal_spt', 'irban', 'jenis', 'mulai', 'selesai', 'kesesuaian', 'status', 'penanda', 'tim', 'ppj', 'dana', 'kendala', 'url'], array_keys($tw2['spt'][0]));
         $this->assertSame([$it->id], array_column($this->untuk(0)[0]['item'], 'item_id'));
     }
 

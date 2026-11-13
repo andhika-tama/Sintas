@@ -31,10 +31,12 @@ flowchart LR
     C -->|tanggal mulai| D[Pelaksanaan]
     D -->|tanggal selesai| E[Penyusunan Laporan]
     E -->|Irban unggah cover LHP| F[Selesai]
-    C -.->|Bagian Umum batalkan nomor| Z[Dibatalkan]
+    C -.->|batalkan penugasan| Z[Dibatalkan]
+    D -.-> Z
+    E -.-> Z
 ```
 
-Nomor yang sudah terbit dapat dibatalkan Bagian Umum kapan saja, dengan alasan tertulis.
+Selama belum Selesai, SPT bernomor dapat dibatalkan Bagian Umum atau Irban pemiliknya, dengan alasan tertulis. Nomornya tetap tercatat di register dan tidak dipakai ulang.
 
 - **Irban** mengajukan nomor. **Bagian Umum** menerima, meminta revisi, atau menolak.
 - Nomor terbit dari stambook digital (`Penomoran`), aman saat dua pengajuan disetujui bersamaan.
@@ -43,9 +45,10 @@ Nomor yang sudah terbit dapat dibatalkan Bagian Umum kapan saja, dengan alasan t
 
 ## Fitur
 
-- **Pengajuan dan penomoran SPT** dengan kotak masuk, register nomor, nomor manual, dan pembatalan nomor.
-- **PKPT per tahun** dan **Perubahan PKPT**: Admin menyusun paket perubahan, Irban mengusulkan, Pimpinan memutuskan.
-- **Monitoring dan rekap**: dasbor per peran, monitoring SPT, rekap triwulan dan tahunan. Ekspor PDF dan Excel; ekspor besar berjalan di antrean.
+- **Pengajuan dan penomoran SPT** dengan kotak masuk, register nomor, nomor manual, kode arsip per SPT (700, 800, 900, …), dan pembatalan.
+- **PKPT per tahun**, **Perubahan PKPT** (paket Admin ber-SK, diputuskan Pimpinan), dan **Perubahan Penugasan** (Irban mengajukan jadwal baru, Pimpinan memutuskan).
+- **Monitoring dan rekap**: dasbor per peran, monitoring SPT (dengan Tim · PPJ), rekap triwulan dan tahunan. Filter Klasifikasi, Kode Arsip, dan Jenis Penugasan ikut ke setiap ekspor. Ekspor PDF dan Excel bergaya; ekspor besar berjalan di antrean.
+- **Realisasi Dana** per SPT, diisi Irban dalam format `Rp600.000`, dengan total per irban dan triwulan di Rekap.
 - **Komentar dan permintaan penjelasan** per SPT, dengan notifikasi lonceng dan email (harian dan ringkasan mingguan).
 - **Halaman publik**: Beranda, Jadwal PKPT, dan Realisasi, dengan cache agregat yang disegarkan tiap tengah malam.
 - **Impor data lama** (pegawai, item PKPT, SPT) dari template Excel.
@@ -53,17 +56,17 @@ Nomor yang sudah terbit dapat dibatalkan Bagian Umum kapan saja, dengan alasan t
 - **Cadangan otomatis** basis data dan berkas, terenkripsi.
 
 > [!IMPORTANT]
-> Halaman publik tidak pernah menampilkan nama pegawai, NIP, nomor SPT, objek di bawah kecamatan, kendala, komentar, atau dokumen.
+> Halaman publik tidak pernah menampilkan nama pegawai, NIP, nomor SPT, objek di bawah kecamatan, kendala, komentar, dokumen, atau realisasi dana.
 
 ### Peran pengguna
 
 | Peran | Hak utama |
 |---|---|
 | Publik | Beranda, Jadwal PKPT, dan Realisasi (data terbatas), tanpa login |
-| Irban | Satu akun bersama per irban. Mengajukan nomor, mengisi SPT irbannya, mengunggah dokumen, menandai Selesai, mengusulkan perubahan jadwal |
-| Bagian Umum | Kotak masuk pengajuan, keputusan, register nomor, nomor manual, pembatalan nomor |
-| Pimpinan | Melihat semua data, berkomentar, memutuskan Perubahan PKPT, mengekspor rekap. Tidak mengubah data SPT |
-| Admin | Pengguna, master data, PKPT, Perubahan PKPT, konten halaman publik, pengaturan, impor, log |
+| Irban | Satu akun bersama per irban (termasuk Irban Khusus dan Sekretariat). Mengajukan nomor, mengisi SPT irbannya, mengunggah dokumen, menandai Selesai, mengisi Realisasi Dana, membatalkan SPT miliknya, mengajukan Perubahan Penugasan |
+| Bagian Umum | Kotak masuk pengajuan, keputusan, register nomor, nomor manual, pembatalan SPT |
+| Pimpinan | Melihat semua data, berkomentar, memutuskan Perubahan PKPT dan Perubahan Penugasan, mengekspor rekap. Tidak mengubah data SPT |
+| Admin | Pengguna, master data (termasuk klasifikasi dan kode arsip), PKPT, Perubahan PKPT, konten halaman publik, pengaturan, impor, log |
 
 ## Memulai
 
@@ -87,7 +90,7 @@ composer dev                       # server pengembangan
 php artisan queue:work
 ```
 
-Akun demo (kata sandi `password`, tidak dibuat di produksi): `admin`, `pimpinan`, `bagianumum`, `irban1` sampai `irban5`. Akun admin produksi dibuat dengan `php artisan sintas:buat-admin {username}`.
+Akun demo (kata sandi `password`, tidak dibuat di produksi): `admin`, `pimpinan`, `sekretaris`, `bagianumum`, `irban1` sampai `irban4`, `irsus`, dan `sekretariat`. Akun admin produksi dibuat dengan `php artisan sintas:buat-admin {username}`.
 
 > [!WARNING]
 > `migrate:fresh` menghapus semua data, termasuk log aktivitas. Jangan pernah menjalankannya di produksi.
@@ -106,10 +109,10 @@ Tes PHPUnit ada di `tests/Feature` (per modul: Spt, Pkpt, Rekap, Ekspor, Publik,
 |---|---|
 | `app/Models` | Model inti: `Spt`, `Pkpt`, `PkptItem`, `PkptPerubahan`, `Irban`, `Pegawai`, `Tim`, `User`, `Aktivitas` |
 | `app/Enums` | `Role`, `StatusSpt`, `StatusPengajuan`, `StatusPkpt`, `StatusPerubahan`, dan status lain |
-| `app/Actions` | Satu kelas per aksi tulis: Auth, Spt, Pkpt, Perubahan dan Usulan PKPT, Komentar, MasterData, Konten, Profil, Pengguna |
-| `app/Services` | Aturan bisnis: `Penomoran`, `PenandaSpt`, `KesesuaianPkpt`, `MonitoringSpt`, `RekapTriwulan`, `PerubahanPkpt`, `Settings`, serta `Ekspor`, `Import`, `Publik` |
+| `app/Actions` | Satu kelas per aksi tulis: Auth, Spt, Pkpt (termasuk Perubahan PKPT), PerubahanPenugasan, Komentar, MasterData, Konten, Profil, Pengguna |
+| `app/Services` | Aturan bisnis: `Penomoran`, `PenandaSpt`, `KesesuaianPkpt`, `MonitoringSpt`, `RekapTriwulan`, `SaringSpt`, `PerubahanPkpt`, `Settings`, serta `Ekspor`, `Import`, `Publik` |
 | `app/Livewire` | Layar per peran: `Admin`, `BagianUmum`, `Irban`, `Pimpinan`, `Publik`, `Spt`, `Notifikasi` |
-| `app/Support` | Utilitas bersama: `CachePublik`, `MingguPkpt`, `Tanggal`, `DiinputOleh`, `LabelAktivitas`, `Navigation` |
+| `app/Support` | Utilitas bersama: `CachePublik`, `MingguPkpt`, `Tanggal`, `Rupiah`, `DiinputOleh`, `LabelAktivitas`, `Navigation` |
 | `app/Policies` | Otorisasi per peran |
 | `app/Jobs`, `app/Notifications` | Ekspor di antrean (`BuatEkspor`), notifikasi lonceng dan email |
 | `app/Console/Commands` | `sintas:buat-admin`, `notifikasi:harian`, `notifikasi:ringkasan-mingguan`, `ekspor:bersihkan` |
@@ -123,17 +126,16 @@ Tes PHPUnit ada di `tests/Feature` (per modul: Spt, Pkpt, Rekap, Ekspor, Publik,
 
 ### Penjadwal
 
-Pekerjaan terjadwal (zona Asia/Jakarta) terdaftar di `routes/console.php`:
+Pekerjaan terjadwal (zona Asia/Jakarta) terdaftar di `routes/console.php`. Semua tugas kecuali penyegaran cache publik berjalan pada jam kantor, karena server fisik hanya menyala 08.00–16.00:
 
 | Waktu | Tugas |
 |---|---|
 | 00:00 | Penyegaran cache publik |
-| 00:10 | Pemangkasan cache kedaluwarsa |
-| 01:00, 01:30 | `backup:clean`, `backup:run` |
-| 05:00 | `ekspor:bersihkan` |
-| 06:00 | `notifikasi:harian` |
-| 08:00 | `backup:monitor` |
-| Senin 07:00 | `notifikasi:ringkasan-mingguan` |
+| 08:30 | `ekspor:bersihkan` |
+| 08:35 | Pemangkasan cache kedaluwarsa |
+| 08:40 | `notifikasi:harian` |
+| Senin 08:45 | `notifikasi:ringkasan-mingguan` |
+| 12:00, 12:10, 12:40 | `backup:clean`, `backup:run`, `backup:monitor` |
 
 Di server, jalankan `php artisan schedule:run` setiap menit lewat cron.
 

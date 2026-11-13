@@ -69,7 +69,8 @@ class BatalkanNomor
         $penerima = app(PenerimaNotifikasi::class);
         if ($irban) {
             DiinputOleh::ingat($user, $diinput);
-            $pembatal = $spt->irban->nama.' (diinput oleh '.Pegawai::find($diinput)->nama_bergelar.')';
+            $penginput = Pegawai::find($diinput)?->nama_bergelar; // may be gone after the commit
+            $pembatal = $spt->irban->nama.($penginput ? ' (diinput oleh '.$penginput.')' : '');
             Notification::send($penerima->bagianUmum()->merge($penerima->pimpinan())->unique('id'), new NomorDibatalkan($spt, $alasan, $pembatal));
         } else {
             $penerima->kirimKeIrban($spt->irban_id, $spt->diinputOleh, fn () => new NomorDibatalkan($spt, $alasan, 'Bagian Umum'));

@@ -15,6 +15,7 @@ use App\Models\KodeArsip;
 use App\Models\Spt;
 use App\Models\User;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -179,6 +180,23 @@ class KlasifikasiTest extends TestCase
             ->call('delete')->assertSet('deleteOpen', false)
             ->assertDispatched('toast', type: 'success', message: 'Klasifikasi AUDIT KINERJA dihapus.')->assertDispatched('fokus-ke', id: 'judul-klasifikasi');
         $this->assertNull(Klasifikasi::find($k->id));
+    }
+
+    /** Final review 2: an SPT lands between the check and the delete; the FK error becomes the same validation error, not a 500. */
+    public function test_hapus_klasifikasi_yang_dipakai_di_antara_cek_dan_hapus_menjadi_galat_validasi(): void
+    {
+        $k = $this->baru();
+        Klasifikasi::deleting(fn () => throw new QueryException('x', 'delete from t', [], new \PDOException('FK', 23000))); // what the DB raises when an SPT references the row
+
+        $this->assertThrows(fn () => app(DeleteKlasifikasi::class)->handle($k), fn (ValidationException $e) => $e->errors() === ['delete' => [self::DIPAKAI]]);
+        $this->assertNotNull(Klasifikasi::find($k->id));
+    }
+
+    /** Final review 3: "/" in nama would split the SPT number ({klasifikasi}). */
+    public function test_nama_klasifikasi_tidak_boleh_memuat_garis_miring(): void
+    {
+        $this->assertThrows(fn () => $this->baru(['nama' => 'AUDIT/KINERJA']), fn (ValidationException $e) => $e->errors() === ['nama' => ['Nama klasifikasi tidak boleh memuat garis miring (/).']]);
+        $this->assertNull(Klasifikasi::where('kode', 'AUDIT_KINERJA')->first());
     }
 
     /** Review Focus 4: a klasifikasi used only by a draf still counts as used (FK restrictOnDelete). */

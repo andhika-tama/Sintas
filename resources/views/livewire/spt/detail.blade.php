@@ -287,7 +287,7 @@
         </div>
     </div>
 
-    @if ($laksanakan || $tombolBatal)
+    @if ($laksanakan || $modalBatal)
         @include('livewire.spt.partials.aksi-modal')
     @endif
 </div>

@@ -21,6 +21,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Notifications\AnonymousNotifiable;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Validation\ValidationException;
+use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -135,7 +136,7 @@ class PembatalanSptTest extends TestCase
             ->set('alasan', 'Penugasan digabung ke SPT lain.')->set('diinput_oleh', $this->penginput->id)->call('batalkan')
             ->assertHasNoErrors()->assertSet('modal', '')->assertDispatched('close-modal', name: 'aksi-batal')
             ->assertDispatched('toast', type: 'success', message: 'Penugasan dibatalkan')->assertDispatched('fokus-ke', id: 'judul-spt')
-            ->assertDontSee('Batalkan Penugasan');
+            ->assertDontSee('Nomor tidak dapat dipakai ulang.'); // the closed modal keeps only its title; the trigger button is gone
         $this->assertSame(StatusPengajuan::Dibatalkan, $spt->fresh()->status_pengajuan);
 
         // Bagian Umum and Pimpinan get no button on the detail page; Pimpinan cannot call it.
@@ -203,6 +204,26 @@ class PembatalanSptTest extends TestCase
         $c->call('batalkan')->assertOk()->assertSet('modal', '')->assertDispatched('close-modal', name: 'aksi-batal')
             ->assertDispatched('toast', type: 'error', message: self::SELESAI)->assertDispatched('fokus-ke', id: 'judul-spt');
         $this->assertSame(StatusPengajuan::Diterima, $spt->fresh()->status_pengajuan);
+    }
+
+    /** Final review 1: BU cancels in another tab; a request in the Irban's tab (Diinput oleh) must keep the modal, and its save becomes a toast. */
+    public function test_modal_batal_tetap_ada_setelah_dibatalkan_di_tab_lain(): void
+    {
+        $spt = $this->terbit();
+        $c = $this->detail($spt)->call('buka', 'batal')->set('alasan', 'Penugasan digabung ke SPT lain.');
+        $this->batal($this->bu, $spt);
+
+        $c->call('gantiPenginput')->assertSet('modal', 'batal')->assertSeeHtml('id="form-aksi-batal"');
+        $c->set('diinput_oleh', $this->penginput->id)->assertSet('modal', 'batal')->assertSeeHtml('id="form-aksi-batal"')
+            ->call('batalkan')->assertOk()->assertSet('modal', '')
+            ->assertDispatched('toast', type: 'error', message: self::BELUM_TERBIT)->assertDispatched('fokus-ke', id: 'judul-spt');
+    }
+
+    /** Final review 7: batalId is set by bukaBatal only. */
+    public function test_batal_id_tidak_bisa_diubah_dari_klien(): void
+    {
+        $c = Livewire::actingAs($this->bu)->test(Register::class);
+        $this->assertThrows(fn () => $c->set('batalId', $this->terbit()->id), CannotUpdateLockedPropertyException::class);
     }
 
     /** Review Focus 2: two tabs cancel the same SPT; the second gets the shared guard's toast, not 403/500. */

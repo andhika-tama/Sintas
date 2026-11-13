@@ -20,6 +20,7 @@ use App\Services\Settings;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -64,6 +65,7 @@ class Register extends Component
 
     public bool $showBatal = false;
 
+    #[Locked]
     public ?int $batalId = null;
 
     public string $alasan = '';

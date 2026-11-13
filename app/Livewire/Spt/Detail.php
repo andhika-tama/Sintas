@@ -255,8 +255,9 @@ class Detail extends Component
         $tahunSppd = $spt->tahun ?? now('Asia/Jakarta')->year;
         // Batalkan Penugasan: the owning Irban (Bagian Umum cancels from the Register); shown while Diterima, disabled with cegah()'s reason.
         $tombolBatal = $user->role === Role::Irban && $user->can('batalkan', $spt) && $spt->status_pengajuan === StatusPengajuan::Diterima;
-        // The batal modal stays open after a Selesai in another tab, so its save still reaches the action and becomes a toast.
-        $modal = ($this->modal === 'batal' ? $tombolBatal : $laksanakan) ? $this->modal : '';
+        // The batal modal is gated on the policy only, not the status: after a Selesai/Dibatalkan in another tab it stays open and its save becomes a toast.
+        $modalBatal = $user->role === Role::Irban && $user->can('batalkan', $spt);
+        $modal = ($this->modal === 'batal' ? $modalBatal : $laksanakan) ? $this->modal : '';
 
         return view('livewire.spt.detail', [
             'spt' => $spt,
@@ -269,6 +270,7 @@ class Detail extends Component
             'hariKerja' => $settings->get('penugasan.hitungan_hari') === 'kerja',
             'laksanakan' => $laksanakan,
             'tombolBatal' => $tombolBatal,
+            'modalBatal' => $modalBatal,
             'blokirBatal' => $tombolBatal ? $batal->cegah($spt) : null,
             'bisaUbah' => auth()->user()->can('update', $spt),
             'ubahSppd' => $ubahSppd,

@@ -124,7 +124,7 @@
 @endif
 
 {{-- Batalkan Penugasan (versi 1.2.1 Task 4): owning Irban, before Selesai (BatalkanNomor::cegah()). Danger confirm; "Kembali" instead of "Batal" so the two buttons never read alike. --}}
-@if ($tombolBatal)
+@if ($modalBatal)
 <x-ui.modal name="aksi-batal" title="Batalkan Penugasan">
     @if ($aktif === 'batal')
         <form id="form-aksi-batal" wire:submit="batalkan" novalidate class="space-y-5">

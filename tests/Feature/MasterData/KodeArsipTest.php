@@ -2,12 +2,14 @@
 
 namespace Tests\Feature\MasterData;
 
+use App\Actions\MasterData\DeleteKodeArsip;
 use App\Actions\MasterData\SaveKodeArsip;
 use App\Enums\Role;
 use App\Livewire\Admin\KodeArsip as Page;
 use App\Models\KodeArsip;
 use App\Models\Spt;
 use App\Models\User;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
@@ -80,6 +82,16 @@ class KodeArsipTest extends TestCase
         Spt::factory()->create(['kode_arsip_id' => $k->id]);
         $this->page()->call('confirmDelete', $k->id)->call('delete')
             ->assertDispatched('toast', type: 'error', message: 'Kode arsip sudah dipakai SPT; tidak bisa dihapus.');
+        $this->assertNotNull($k->fresh());
+    }
+
+    /** Final review 2: an SPT lands between the check and the delete; the FK error becomes the same validation error. */
+    public function test_delete_used_between_check_and_delete_is_a_validation_error(): void
+    {
+        $k = KodeArsip::where('kode', '700')->firstOrFail();
+        KodeArsip::deleting(fn () => throw new QueryException('x', 'delete from t', [], new \PDOException('FK', 23000))); // what the DB raises when an SPT references the row
+
+        $this->assertThrows(fn () => app(DeleteKodeArsip::class)->handle($k), fn (ValidationException $e) => $e->errors() === ['delete' => ['Kode arsip sudah dipakai SPT; tidak bisa dihapus.']]);
         $this->assertNotNull($k->fresh());
     }
 

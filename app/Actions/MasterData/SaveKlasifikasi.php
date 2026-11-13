@@ -18,7 +18,7 @@ class SaveKlasifikasi
     {
         return [
             ...$id ? [] : ['kode' => ['required', 'string', 'max:30', 'regex:/^[A-Z0-9_]+$/', Rule::unique('klasifikasi', 'kode')]],
-            'nama' => ['required', 'string', 'max:100', function (string $attr, mixed $nilai, \Closure $gagal) use ($id) {
+            'nama' => ['required', 'string', 'max:100', 'not_regex:~/~', function (string $attr, mixed $nilai, \Closure $gagal) use ($id) {
                 if (Klasifikasi::whereRaw('lower(nama) = ?', [mb_strtolower(trim((string) $nilai))])->when($id, fn ($q) => $q->whereKeyNot($id))->exists()) {
                     $gagal('Nama klasifikasi sudah ada.');
                 }
@@ -40,6 +40,7 @@ class SaveKlasifikasi
             'kode.max' => 'Kode maksimal 30 karakter.',
             'kode.unique' => 'Kode klasifikasi sudah ada.',
             'nama.required' => 'Isi nama klasifikasi.',
+            'nama.not_regex' => 'Nama klasifikasi tidak boleh memuat garis miring (/).',
             'nama.max' => 'Nama maksimal 100 karakter.',
             'syaratSelesai.*' => 'Pilih syarat selesai.',
             'warna.regex' => 'Warna harus 6 digit heksadesimal, mis. BDD7EE.',

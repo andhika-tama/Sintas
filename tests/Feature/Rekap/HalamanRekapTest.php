@@ -307,6 +307,15 @@ class HalamanRekapTest extends TestCase
         $this->assertCount(0, $dihitung);
     }
 
+    /** Final review 6: the Detail tab hides rencana-only items under C1/C2, so it carries the same note (once), and none when the rule shows the rencana. */
+    public function test_tab_detail_memuat_catatan_rencana_hanya_bila_berlaku(): void
+    {
+        $c1 = RekapTriwulan::CATATAN_TANPA_RENCANA;
+        $this->halaman($this->pimpinan, ['tab' => 'detail', 'klasifikasi' => (string) $this->k])->assertSee($c1);
+        $this->halaman($this->pimpinan, ['tab' => 'detail'])->assertDontSee($c1)->assertDontSee(RekapTriwulan::CATATAN_RENCANA_GABUNG);
+        $this->halaman($this->pimpinan, ['tab' => 'detail', 'jenis' => (string) $this->j2->id])->assertDontSee($c1);
+    }
+
     /** 1.3 Task 2: "–" and the note only when the rule hides the rencana; numbers are those of RekapTriwulanTest (fixture without extra SPT). */
     public function test_saring_di_layar_tanda_dan_catatan_hanya_bila_relevan(): void
     {

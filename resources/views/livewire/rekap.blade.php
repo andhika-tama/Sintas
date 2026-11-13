@@ -90,6 +90,9 @@
                 @endif
             </section>
         @endforeach
+        @if ($detail !== null && ($catatan = \App\Services\Ekspor\PembangunRekap::catatanRencana($rekap, 'rr')))
+            <x-ui.alert variant="info">{{ $catatan }}</x-ui.alert>
+        @endif
         @foreach ($detail ?? [] as $d)
             @php $judulIrban = $d['irban']['nama']; @endphp
             <section wire:key="detail-{{ $d['irban']['id'] }}" aria-labelledby="detail-irban-{{ $d['irban']['id'] }}">

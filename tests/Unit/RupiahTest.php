@@ -70,6 +70,10 @@ class RupiahTest extends TestCase
             'bool' => [true, $format],
             '13 digit' => ['1000000000000', $batas],
             '13 digit terformat' => ['Rp1.000.000.000.000', $batas],
+            'desimal inggris' => ['600000.00', $format],
+            'satu titik' => ['1.5', $format],
+            'dua titik' => ['1.2.3', $format],
+            'kelompok empat' => ['1.0000', $format],
             'sangat panjang' => [str_repeat('9', 40), $batas],
         ];
     }

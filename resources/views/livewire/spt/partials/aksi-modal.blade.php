@@ -90,7 +90,7 @@
                     :min="$spt->tanggal_mulai?->toDateString()" :max="$hariIni" :error="$errors->first('tanggal_lhp')" class="tabular-nums" />
             @endif
             <x-ui.input-rupiah label="Realisasi dana (opsional)" name="realisasi_dana" id="realisasi_dana" wire:model="realisasi_dana" :value="$realisasi_dana"
-                helper="Dapat diisi atau diubah nanti dari halaman detail." :error="$errors->first('realisasi_dana')" />
+                helper="Dapat diisi atau diubah nanti dari halaman detail. Mengosongkan kolom ini tidak menghapus nilai yang sudah tersimpan." :error="$errors->first('realisasi_dana')" />
         </form>
     @endif
     <x-slot:footer>

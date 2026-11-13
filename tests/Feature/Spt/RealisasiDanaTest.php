@@ -223,6 +223,14 @@ class RealisasiDanaTest extends TestCase
         $this->detail($spt)->call('buka', 'dana')->assertSet('realisasi_dana', '600000');
     }
 
+    /** Final review 2 (server half): reopening after an unsaved edit resets the model to the stored value; the visible text follows through x-modelable (only the browser proves that, see decisions Fase 13). */
+    public function test_buka_ulang_mereset_isian_ke_nilai_tersimpan(): void
+    {
+        $spt = $this->spt('diterima', ['realisasi_dana' => 600000]);
+        $this->detail($spt)->call('buka', 'dana')->assertSet('realisasi_dana', '600000')->assertSeeHtml('x-modelable="digit"')
+            ->set('realisasi_dana', '700000')->call('buka', 'dana')->assertSet('realisasi_dana', '600000');
+    }
+
     public function test_modal_menolak_tanpa_penginput_dan_nilai_tak_berubah_sebagai_galat_field(): void
     {
         $spt = $this->spt();
@@ -255,6 +263,7 @@ class RealisasiDanaTest extends TestCase
             'eksponen' => ['1e9', $format, null],
             'minus' => ['-5', $format, null],
             'huruf' => ['12a', $format, null],
+            'desimal inggris' => ['600000.00', $format, null],
             'spasi tengah' => [' 1 000 ', null, 1000],
             '13 digit' => ['1000000000000', 'Realisasi dana maksimal Rp999.999.999.999.', null],
             'batas' => ['999999999999', null, 999999999999],

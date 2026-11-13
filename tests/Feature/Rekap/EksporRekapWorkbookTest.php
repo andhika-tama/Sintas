@@ -7,6 +7,8 @@ use App\Exports\RekapSheet;
 use App\Jobs\BuatEkspor;
 use App\Models\Ekspor as EksporModel;
 use App\Models\Irban;
+use App\Models\JenisPenugasan;
+use App\Models\Klasifikasi;
 use App\Models\KodeArsip;
 use App\Models\Spt;
 use App\Models\User;
@@ -476,6 +478,32 @@ class EksporRekapWorkbookTest extends TestCase
         $this->assertSame('rekap-triwulan-2026-rr-klasifikasi-jenis-dana', $nama([]));
         $this->assertSame('rekap-triwulan-2026-klasifikasi-reguler-kode-arsip-700-pengawasan-umum-jenis-lainnya-rr', $nama(['klasifikasi' => $this->r, 'kode_arsip' => $kode, 'jenis' => 'lainnya', 'bagian' => ['rr']]));
         $this->assertSame('rekap-triwulan-2026-jenis-jenis-satu', $nama(['jenis' => (string) $this->j1->id, 'klasifikasi' => '99999', 'bagian' => PembangunRekap::BAGIAN]));
+    }
+
+    /** Final review 3: ekspor.nama_file is varchar(255); long master names must not make the queued row fail under MySQL strict mode. */
+    public function test_nama_file_dengan_nama_master_panjang_dibatasi_dan_baris_antrean_terbuat(): void
+    {
+        Queue::fake();
+        $jenis = JenisPenugasan::factory()->create(['nama' => rtrim(substr(str_repeat('jenis panjang ', 20), 0, 255))]);
+        Klasifikasi::whereKey($this->r)->update(['nama' => substr(str_repeat('klasifikasi ', 9), 0, 100)]);
+        $kode = KodeArsip::where('kode', '700')->first();
+        $kode->update(['nama' => substr(str_repeat('arsip ', 20), 0, 100)]);
+        $this->app->bind(PembangunRekap::class, fn () => new class(app(RekapTriwulan::class), app(RealisasiItemPkpt::class)) extends PembangunRekap
+        {
+            public function jumlah(User $u, array $f): int
+            {
+                return Ekspor::BATAS_LANGSUNG + 1;
+            }
+        });
+
+        $this->assertNull(app(Ekspor::class)->minta($this->pimpinan, 'rekap', 'xlsx', [
+            'tahun' => 2026, 'klasifikasi' => (string) $this->r, 'kode_arsip' => (string) $kode->id, 'jenis' => (string) $jenis->id, 'bagian' => PembangunRekap::BAGIAN,
+        ]));
+        $e = EksporModel::sole();
+        $this->assertLessThanOrEqual(240, strlen($e->nama_file));
+        $this->assertStringStartsWith('rekap-triwulan-2026-klasifikasi-klasifikasi-klasifikasi', $e->nama_file);
+        $this->assertStringEndsWith('.xlsx', $e->nama_file);
+        $this->assertSame($e->filter['saring']['jenis'], $jenis->id);
     }
 
     /** Review Focus 2: the queued job rebuilds the filter through filter(), so the stored `saring` is applied and re-validated. */

@@ -23,7 +23,7 @@ class Rupiah
     }
 
     /**
-     * Empty/whitespace/`Rp` alone = null. Drops whitespace, a leading `Rp`, thousands dots and the part after the comma
+     * Empty/whitespace/`Rp` alone = null. Drops whitespace, a leading `Rp` (and its dot), thousands dots (strict groups of three) and the part after the comma
      * (which must be digits too); what is left must be digits, at most MAKS. Anything else throws with the exact message.
      */
     public static function baca(mixed $v): ?int
@@ -37,17 +37,21 @@ class Rupiah
         if (! is_string($v)) {
             throw new InvalidArgumentException(self::GALAT_FORMAT);
         }
-        $teks = preg_replace('/^rp/i', '', preg_replace('/\s+/u', '', $v) ?? '');
+        $teks = preg_replace('/^rp\.?/i', '', preg_replace('/\s+/u', '', $v) ?? '');
         if (! preg_match('/^([\d.]*)(?:,(\d*))?$/', $teks, $m)) {
             throw new InvalidArgumentException(self::GALAT_FORMAT);
         }
-        $digit = str_replace('.', '', $m[1]);
-        if ($digit === '') {
-            if ($teks === '' || $teks === '.') {
+        if ($m[1] === '') {
+            if ($teks === '') {
                 return null;
             }
             throw new InvalidArgumentException(self::GALAT_FORMAT); // ",50" without a whole part
         }
+        // Dots are thousands groups only: "600000.00", "1.5", "1.2.3", "1.0000" are not Rupiah.
+        if (! preg_match('/^(?:\d+|\d{1,3}(?:\.\d{3})+)$/', $m[1])) {
+            throw new InvalidArgumentException(self::GALAT_FORMAT);
+        }
+        $digit = str_replace('.', '', $m[1]);
         $digit = ltrim($digit, '0') ?: '0';
         if (strlen($digit) > 12) {
             throw new InvalidArgumentException(self::GALAT_MAKS);

@@ -137,7 +137,8 @@ class PembangunRekap implements Pembangun
     public function namaFile(User $user, array $filter): string
     {
         $kode = $filter['irban'] ? Irban::whereKey($filter['irban'])->value('kode_nomor') : null;
-        $saring = collect(app(SaringSpt::class)->ringkasan($filter['saring']))->map(fn ($r) => '-'.Str::slug($r))->implode('');
+        // ekspor.nama_file is varchar(255): master names run to 255 chars, so cap the filter part (name stays under ~190 with year, irban, bagian and extension).
+        $saring = rtrim(Str::limit(collect(app(SaringSpt::class)->ringkasan($filter['saring']))->map(fn ($r) => '-'.Str::slug($r))->implode(''), 120, ''), '-');
 
         return "rekap-triwulan-{$filter['tahun']}".($kode ? "-irban-{$kode}" : '').$saring.($filter['bagian'] === self::BAGIAN ? '' : '-'.implode('-', $filter['bagian']));
     }

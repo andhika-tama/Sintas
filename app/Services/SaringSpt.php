@@ -43,10 +43,15 @@ class SaringSpt
     {
         $f = $this->dari($saring);
 
+        // A master row deleted since dari() validated it yields no line instead of an error.
+        $klasifikasi = $f['klasifikasi'] !== null ? Klasifikasi::whereKey($f['klasifikasi'])->value('nama') : null;
+        $arsip = $f['kode_arsip'] !== null ? KodeArsip::find($f['kode_arsip']) : null;
+        $jenis = $f['jenis'] === self::LAINNYA ? Spt::LABEL_LAINNYA : ($f['jenis'] !== null ? JenisPenugasan::whereKey($f['jenis'])->value('nama') : null);
+
         return array_values(array_filter([
-            $f['klasifikasi'] !== null ? 'Klasifikasi: '.Klasifikasi::whereKey($f['klasifikasi'])->value('nama') : null,
-            $f['kode_arsip'] !== null ? 'Kode Arsip: '.($k = KodeArsip::find($f['kode_arsip']))->kode.' · '.$k->nama : null,
-            $f['jenis'] !== null ? 'Jenis: '.($f['jenis'] === self::LAINNYA ? Spt::LABEL_LAINNYA : JenisPenugasan::whereKey($f['jenis'])->value('nama')) : null,
+            $klasifikasi !== null ? 'Klasifikasi: '.$klasifikasi : null,
+            $arsip ? 'Kode Arsip: '.$arsip->kode.' · '.$arsip->nama : null,
+            $jenis !== null ? 'Jenis: '.$jenis : null,
         ]));
     }
 

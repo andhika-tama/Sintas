@@ -125,9 +125,10 @@ class Rekap extends Component
         };
         $detail = $this->tab === 'detail';
 
-        // The Detail tab needs only the year's status for its alert, not the whole calculation.
+        // The Detail tab needs only the year's status for its alert and the C1/C2 note, not the whole calculation.
         $rekap = $detail
-            ? ['tahun' => $f['tahun'], 'pkpt_disahkan' => Pkpt::where('tahun', $f['tahun'])->where('status', StatusPkpt::Disahkan)->exists()]
+            ? ['tahun' => $f['tahun'], 'pkpt_disahkan' => Pkpt::where('tahun', $f['tahun'])->where('status', StatusPkpt::Disahkan)->exists(),
+                'rencana' => app(RekapTriwulan::class)->aturanRencana(app(SaringSpt::class)->dari($f['saring']))]
             : app(RekapTriwulan::class)->hitung($f['tahun'], $f['irban'], $f['saring']);
         // An Irban account only lists the years it has SPT or PKPT items in; the current year and the selected one stay.
         $milik = $pimpinan ? null : $user->irban_id;

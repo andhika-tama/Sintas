@@ -12,9 +12,11 @@ use App\Models\Spt;
 use App\Models\User;
 use App\Services\RealisasiItemPkpt;
 use App\Services\RekapTriwulan;
+use App\Services\SaringSpt;
 use App\Support\PaletGrafik;
 use App\Support\Tanggal;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Str;
 
 /**
  * Rekap Triwulanan export. The sections come from bagian(), the same method the page renders, so the file equals the screen.
@@ -48,23 +50,27 @@ class PembangunRekap implements Pembangun
 
     private const KOLOM_DETAIL = ['Jenis Penugasan', 'Periode Penugasan (PKPT)', 'Nomor SPT', 'Realisasi Periode', 'Kesesuaian dengan Jadwal PKPT', 'Status', 'Permasalahan/Kendala'];
 
-    /** hitung() results of this instance (one request or one job), so jumlah() and export() do not recompute: "tahun|irban" => result. */
+    /** hitung() results of this instance (one request or one job), so jumlah() and export() do not recompute: "tahun|irban|saring" => result. */
     private array $hasilHitung = [];
 
     public function __construct(private RekapTriwulan $rekap, private RealisasiItemPkpt $detailRealisasi) {}
 
-    private function hitung(int $tahun, ?int $irban = null): array
+    private function hitung(int $tahun, ?int $irban, array $saring): array
     {
-        return $this->hasilHitung["{$tahun}|{$irban}"] ??= $this->rekap->hitung($tahun, $irban);
+        return $this->hasilHitung["{$tahun}|{$irban}|".json_encode($saring)] ??= $this->rekap->hitung($tahun, $irban, $saring);
     }
 
     /**
      * Items of the year's Disahkan PKPT without target_spt whose rencana falls in the period (tw 0 = the year), scoped like
-     * RekapTriwulan::hitung and placed by the same RekapTriwulan::rencanaItem (read-only reuse).
+     * RekapTriwulan::hitung and placed by the same RekapTriwulan::rencanaItem (read-only reuse). 0 when $saring hides the rencana.
      */
-    public function tanpaTarget(int $tahun, int $tw, ?int $irban): int
+    public function tanpaTarget(int $tahun, int $tw, ?int $irban, array $saring = []): int
     {
-        return PkptItem::aktif()->tanpaTarget()
+        if (! $this->rekap->aturanRencana($saring)['tampil']) {
+            return 0;
+        }
+
+        return PkptItem::aktif()->tanpaTarget()->saring($saring)
             ->whereHas('pkpt', fn ($q) => $q->where('tahun', $tahun)->where('status', StatusPkpt::Disahkan))
             ->when($irban, fn ($q) => $q->where('irban_id', $irban))->get()
             ->filter(fn (PkptItem $item) => ($r = $this->rekap->rencanaItem($item, $tahun)) && (! $tw || $r[0] === $tw))->count();
@@ -87,7 +93,10 @@ class PembangunRekap implements Pembangun
         Gate::forUser($user)->authorize('rekap', Spt::class);
     }
 
-    /** Irban accounts are always scoped to their own irban; a tampered `irban` is ignored. */
+    /**
+     * Irban accounts are always scoped to their own irban; a tampered `irban` is ignored. `saring` (SaringSpt::dari) is read from the
+     * flat page keys or, for a queued export, from the stored `saring`, and re-validated either way.
+     */
     public function filter(User $user, array $filter): array
     {
         $tahun = (int) ($filter['tahun'] ?? 0);
@@ -99,6 +108,7 @@ class PembangunRekap implements Pembangun
             'tw' => $tw >= 1 && $tw <= 4 ? $tw : 0,
             'irban' => $irban ? (int) $irban : null,
             'bagian' => self::bagianTerpilih($filter['bagian'] ?? null),
+            'saring' => app(SaringSpt::class)->dari(is_array($filter['saring'] ?? null) ? $filter['saring'] : $filter),
         ];
     }
 
@@ -110,7 +120,7 @@ class PembangunRekap implements Pembangun
     {
         $ringkas = 0;
         if (array_diff($filter['bagian'], ['detail'])) {
-            $data = $this->hitung($filter['tahun'], $filter['irban']);
+            $data = $this->hitung($filter['tahun'], $filter['irban'], $filter['saring']);
             foreach ($this->bagian($data, $filter['tw'], $filter['irban'] ? 'irban' : 'gabungan') as $s) {
                 $ringkas += in_array($s['kode'], $filter['bagian'], true) ? 2 + count($s['tabel'][0]['baris']) : 0;
             }
@@ -120,25 +130,33 @@ class PembangunRekap implements Pembangun
         return $ringkas + (in_array('detail', $filter['bagian'], true) ? array_sum(array_map(fn ($g) => count($g['baris']), $this->detail($filter))) : 0);
     }
 
+    /** e.g. rekap-triwulan-2026-irban-II-klasifikasi-khusus-kode-arsip-700-jenis-lainnya-rr: each active filter, slugged. */
     public function namaFile(User $user, array $filter): string
     {
         $kode = $filter['irban'] ? Irban::whereKey($filter['irban'])->value('kode_nomor') : null;
+        $saring = collect(app(SaringSpt::class)->ringkasan($filter['saring']))->map(fn ($r) => '-'.Str::slug($r))->implode('');
 
-        return "rekap-triwulan-{$filter['tahun']}".($kode ? "-irban-{$kode}" : '').($filter['bagian'] === self::BAGIAN ? '' : '-'.implode('-', $filter['bagian']));
+        return "rekap-triwulan-{$filter['tahun']}".($kode ? "-irban-{$kode}" : '').$saring.($filter['bagian'] === self::BAGIAN ? '' : '-'.implode('-', $filter['bagian']));
+    }
+
+    /** Title row of the sheets: year, TW and the active Klasifikasi / Kode Arsip / Jenis (SaringSpt::ringkasan). */
+    private function judul(array $filter): string
+    {
+        return implode(' · ', ['Rekap Triwulanan '.$filter['tahun'], ...($filter['tw'] ? [self::TW[$filter['tw']]] : []), ...app(SaringSpt::class)->ringkasan($filter['saring'])]);
     }
 
     /** Sheets: Gabungan (summary sections only; left out when only `detail` is picked) then one per irban, or only the scoped irban. */
     public function export(User $user, array $filter): RekapWorkbook
     {
-        $judul = 'Rekap Triwulanan '.$filter['tahun'].($filter['tw'] ? ' · '.self::TW[$filter['tw']] : '');
+        $judul = $this->judul($filter);
         $dibuat = now('Asia/Jakarta')->translatedFormat('d F Y H.i').' WIB';
         $sheets = [];
         if (! $filter['irban'] && array_diff($filter['bagian'], ['detail'])) {
-            $sheets[] = new RekapSheet($judul, 'Gabungan', $dibuat, $this->bagianSheet($this->hitung($filter['tahun']), $filter, null));
+            $sheets[] = new RekapSheet($judul, 'Gabungan', $dibuat, $this->bagianSheet($this->hitung($filter['tahun'], null, $filter['saring']), $filter, null));
         }
         $detail = in_array('detail', $filter['bagian'], true) ? array_column($this->detail($filter), null, 'id') : [];
         foreach (Irban::orderBy('id')->when($filter['irban'], fn ($q, $id) => $q->whereKey($id))->get(['id', 'nama']) as $i) {
-            $bagian = $this->bagianSheet($this->hitung($filter['tahun'], $i->id), $filter, $i->id);
+            $bagian = $this->bagianSheet($this->hitung($filter['tahun'], $i->id, $filter['saring']), $filter, $i->id);
             if (isset($detail[$i->id])) {
                 $bagian[] = ['judul' => self::DETAIL, 'kolom' => self::KOLOM_DETAIL, 'tipe' => ['label', 'tanggal', 'nomor', 'tanggal', 'teks', 'teks', 'panjang'],
                     'baris' => $detail[$i->id]['baris'], 'total' => [], 'gabung' => $detail[$i->id]['gabung']];
@@ -153,13 +171,14 @@ class PembangunRekap implements Pembangun
      * Selected summary sections of one sheet in RekapSheet shape ($irban null = the Gabungan sheet, which adds "Ringkasan per Irban"
      * after Rencana vs Realisasi). Percentages above 100 become "133 *". CATATAN_TARGET is a "Catatan" section right under the section
      * kodeCatatanTarget() picks (as in the PDF; after "Ringkasan per Irban" on Gabungan); CATATAN_LEBIH is a closing "Catatan" section.
+     * The rencana note (catatanRencana, C1/C2) joins the same "Catatan" under each section with a Rencana column (rr, jenis).
      */
     private function bagianSheet(array $data, array $filter, ?int $irban): array
     {
         $gabungan = $irban === null;
         // Only the row's percentage cell (index `lebih`) gets the marker; the cell becomes text, e.g. "133 *".
         $tanda = fn (array $b) => array_map(fn ($n, $i) => $i === $b['lebih'] ? $n.' *' : $n, $b['sel'], array_keys($b['sel']));
-        $catatan = fn (string $teks) => ['judul' => 'Catatan', 'kolom' => ['Keterangan'], 'tipe' => ['label'], 'baris' => [[$teks]], 'total' => []];
+        $catatan = fn (string ...$teks) => ['judul' => 'Catatan', 'kolom' => ['Keterangan'], 'tipe' => ['label'], 'baris' => array_map(fn ($t) => [$t], $teks), 'total' => []];
         $kodeTarget = $this->kodeCatatanTarget($filter, $irban);
         $hasil = [];
         $lebih = false;
@@ -178,8 +197,9 @@ class PembangunRekap implements Pembangun
                 $hasil[] = ['judul' => 'Ringkasan per Irban', 'kolom' => ['Irban', ...self::RR[0]], 'tipe' => ['label', 'angka', 'angka', 'angka'], 'total' => [],
                     'baris' => array_map(fn ($b) => [$b['label'], ...$tanda($b)], $ringkasan)];
             }
-            if ($s['kode'] === $kodeTarget) {
-                $hasil[] = $catatan(self::CATATAN_TARGET);
+            $teks = array_filter([$s['kode'] === $kodeTarget ? self::CATATAN_TARGET : null, self::catatanRencana($data, $s['kode'])]);
+            if ($teks) {
+                $hasil[] = $catatan(...$teks);
             }
         }
         if ($lebih) {
@@ -189,13 +209,19 @@ class PembangunRekap implements Pembangun
         return $hasil;
     }
 
+    /** The rencana note (C1/C2) under a section with a Rencana column, as hitung() decided it; null elsewhere. Shared by the page and both files. */
+    public static function catatanRencana(array $rekap, string $kode): ?string
+    {
+        return in_array($kode, ['rr', 'jenis'], true) ? ($rekap['rencana']['catatan'] ?? null) : null;
+    }
+
     public function html(User $user, array $filter): string
     {
-        $data = $this->hitung($filter['tahun'], $filter['irban']);
+        $data = $this->hitung($filter['tahun'], $filter['irban'], $filter['saring']);
         $pilihan = $filter['bagian'];
 
         return view('pdf.rekap-triwulan', [
-            'tahun' => $filter['tahun'], 'tw' => $filter['tw'] ? self::TW[$filter['tw']] : 'Semua TW',
+            'tahun' => $filter['tahun'], 'tw' => $filter['tw'] ? self::TW[$filter['tw']] : 'Semua TW', 'saring' => app(SaringSpt::class)->ringkasan($filter['saring']), 'rekap' => $data,
             'irban' => $filter['irban'] ? Irban::whereKey($filter['irban'])->value('nama') : null,
             'pkptDisahkan' => $data['pkpt_disahkan'], 'catatanTarget' => $this->kodeCatatanTarget($filter, $filter['irban']), 'detailJudul' => self::DETAIL, 'detailKolom' => self::KOLOM_DETAIL,
             'detail' => in_array('detail', $pilihan, true) ? $this->detail($filter) : [], 'pilihan' => $pilihan, 'grafik' => $this->grafik($data, $filter),
@@ -209,11 +235,13 @@ class PembangunRekap implements Pembangun
     {
         $kode = array_values(array_intersect(['rr', 'jenis'], $filter['bagian']))[0] ?? null;
 
-        return $kode && $this->tanpaTarget($filter['tahun'], $filter['tw'], $irban) > 0 ? $kode : null;
+        return $kode && $this->tanpaTarget($filter['tahun'], $filter['tw'], $irban, $filter['saring']) > 0 ? $kode : null;
     }
 
     /**
      * Bar chart data per selected summary section for the PDF (partial pdf.partials.grafik-batang). Values follow the filter's TW (0 = the year).
+     * When the rule hides the rencana (rencana.tampil false), rr draws Realisasi only ("Grafik Realisasi per Irban", or "per Triwulan" for
+     * one irban) and the % per jenis chart, which needs a rencana, is left out.
      *
      * @return array<string, array{jenis: string, judul: string, baris: list<array>, legenda: list<array>}>
      */
@@ -222,15 +250,17 @@ class PembangunRekap implements Pembangun
         $tw = $filter['tw'];
         $ambil = fn (array $b) => $tw ? $b['tw'][$tw] : $b['total'];
         $rr = [['label' => 'Rencana', 'isi' => PaletGrafik::RENCANA_ISI, 'garis' => PaletGrafik::RENCANA_GARIS], ['label' => 'Realisasi', 'isi' => PaletGrafik::REALISASI, 'garis' => PaletGrafik::REALISASI]];
-        $pasang = fn (array $s) => [$s['rencana'] ?? 0, $s['realisasi'] ?? 0];
-        $teksRr = fn (array $n) => ["Rencana {$n[0]}", "Realisasi {$n[1]}"];
+        $tampil = $rekap['rencana']['tampil'] ?? true;
+        $pasang = fn (array $s) => $tampil ? [$s['rencana'] ?? 0, $s['realisasi'] ?? 0] : [$s['realisasi'] ?? 0];
+        $teksRr = fn (array $n) => $tampil ? ["Rencana {$n[0]}", "Realisasi {$n[1]}"] : ["Realisasi {$n[0]}"];
         $hasil = [];
         foreach ($filter['bagian'] as $kode) {
             if ($kode === 'rr') {
                 $baris = $filter['irban']
                     ? array_map(fn ($n) => ['label' => self::TW[$n], 'nilai' => $v = $pasang($rekap['irban']['total']['tw'][$n]), 'teks' => $teksRr($v)], $tw ? [$tw] : array_keys(self::TW))
                     : array_map(fn ($b) => ['label' => $b['nama'], 'nilai' => $v = $pasang($ambil($b)), 'teks' => $teksRr($v)], $rekap['irban']['baris']);
-                $hasil['rr'] = ['jenis' => 'berpasangan', 'judul' => 'Grafik Rencana vs Realisasi', 'baris' => $baris, 'legenda' => $rr];
+                $judul = $tampil ? 'Grafik Rencana vs Realisasi' : ($filter['irban'] ? 'Grafik Realisasi per Triwulan' : 'Grafik Realisasi per Irban');
+                $hasil['rr'] = ['jenis' => 'berpasangan', 'judul' => $judul, 'baris' => $baris, 'legenda' => $tampil ? $rr : [$rr[1]]];
             } elseif ($kode === 'klasifikasi') {
                 $hasil['klasifikasi'] = ['jenis' => 'berpasangan', 'judul' => 'Grafik Per Klasifikasi', 'legenda' => [
                     ['label' => 'Berjalan', 'isi' => PaletGrafik::BERJALAN_ISI, 'garis' => PaletGrafik::BERJALAN_GARIS],
@@ -240,7 +270,7 @@ class PembangunRekap implements Pembangun
 
                         return ['label' => "{$b['nama']} (".($jalan + $selesai).')', 'nilai' => [$jalan, $selesai], 'teks' => "Berjalan {$jalan} · Selesai {$selesai}"];
                     }, $rekap['klasifikasi']['baris'])];
-            } elseif ($kode === 'jenis') {
+            } elseif ($kode === 'jenis' && $tampil) {
                 $baris = [];
                 foreach ($rekap['jenis']['baris'] as $b) {
                     [$rencana, $realisasi] = [$ambil($b)['rencana'] ?? 0, $ambil($b)['realisasi'] ?? 0];
@@ -272,7 +302,7 @@ class PembangunRekap implements Pembangun
     private function detail(array $filter): array
     {
         $hasil = [];
-        foreach ($this->detailRealisasi->untuk($filter['tahun'], $filter['tw'], $filter['irban']) as $g) {
+        foreach ($this->detailRealisasi->untuk($filter['tahun'], $filter['tw'], $filter['irban'], $filter['saring']) as $g) {
             $baris = $gabung = [];
             foreach ($g['item'] as $it) {
                 $mulai = count($baris);

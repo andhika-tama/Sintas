@@ -15,6 +15,12 @@ use App\Models\Spt;
 /** Quarterly recap (PRD §7.9): rencana vs realisasi per irban, per klasifikasi and per jenis penugasan. */
 class RekapTriwulan
 {
+    /** C1 (1.3 Task 1 §1.2): Rencana and % are "–" because items have no klasifikasi or kode arsip. */
+    public const CATATAN_TANPA_RENCANA = 'Rencana PKPT tidak dapat difilter berdasarkan klasifikasi atau kode arsip, sehingga tidak ditampilkan.';
+
+    /** C2: filter on a wajib klasifikasi while more than one klasifikasi is wajib; the rencana cannot be split between them. */
+    public const CATATAN_RENCANA_GABUNG = 'Rencana mencakup semua klasifikasi yang wajib item PKPT.';
+
     public function __construct(private Triwulan $triwulan) {}
 
     /**
@@ -27,9 +33,14 @@ class RekapTriwulan
      *   klasifikasi: {baris: list<{id, nama, tw, total}>, total: {tw, total}}              cells {jumlah, berjalan, selesai}
      *   jenis:       {baris: list<{id: ?int, nama, tw, total}>, total: {tw, total}}        cells {rencana, realisasi, persen, jumlah}
      * Totals rows are sums over the rows with `persen` recomputed from the summed numbers.
+     *   rencana: {tampil: bool, catatan: ?string} (aturanRencana); when tampil is false every `rencana` and `persen` cell is null.
+     * $saring (Klasifikasi / Kode Arsip / Jenis, re-validated here by SaringSpt::dari) filters the SPT of every section;
+     * the items behind Rencana are filtered by jenis only (PkptItem::scopeSaring).
      */
-    public function hitung(int $tahun, ?int $irbanId = null): array
+    public function hitung(int $tahun, ?int $irbanId = null, array $saring = []): array
     {
+        $saring = app(SaringSpt::class)->dari($saring);
+        $aturan = $this->aturanRencana($saring);
         $irban = Irban::orderBy('id')->when($irbanId, fn ($q) => $q->whereKey($irbanId))->get(['id', 'nama', 'kode_nomor']);
         $klasifikasi = Klasifikasi::urut()->get(['id', 'nama']);
         $jenis = JenisPenugasan::orderBy('nama')->get(['id', 'nama']);
@@ -46,7 +57,7 @@ class RekapTriwulan
         $perJenis[-1] = array_fill(1, 4, $jn); // SPT with a free-text jenis (Lainnya): one group for all values
         $kunciJenis = fn (?int $id) => isset($perJenis[$id]) ? $id : 0;
 
-        $items = PkptItem::aktif()
+        $items = ! $aturan['tampil'] ? [] : PkptItem::aktif()->saring($saring)
             ->whereHas('pkpt', fn ($q) => $q->where('tahun', $tahun)->where('status', StatusPkpt::Disahkan))
             ->when($irbanId, fn ($q) => $q->where('irban_id', $irbanId))
             ->get();
@@ -62,7 +73,7 @@ class RekapTriwulan
             $perJenis[$kunciJenis($item->jenis_penugasan_id)][$tw]['rencana'] += $target;
         }
 
-        $q = Spt::where('status_pengajuan', StatusPengajuan::Diterima)->when($irbanId, fn ($q) => $q->where('irban_id', $irbanId));
+        $q = Spt::where('status_pengajuan', StatusPengajuan::Diterima)->when($irbanId, fn ($q) => $q->where('irban_id', $irbanId))->saring($saring);
         $this->triwulan->batasi($q, $tahun);
         foreach ($q->get() as $spt) {
             $dasar = $this->triwulan->tanggalDasar($spt);
@@ -93,13 +104,41 @@ class RekapTriwulan
             $barisJenis[] = ['id' => null, 'nama' => 'Tanpa jenis penugasan', ...$this->tabel($perJenis[0])];
         }
 
-        return [
+        $hasil = [
             'tahun' => $tahun,
             'pkpt_disahkan' => Pkpt::where('tahun', $tahun)->where('status', StatusPkpt::Disahkan)->exists(),
             'irban' => $this->denganTotal($irban->map(fn ($i) => ['id' => $i->id, 'nama' => $i->nama, 'kode_nomor' => $i->kode_nomor, ...$this->tabel($perIrban[$i->id])])->all(), $rr),
             'klasifikasi' => $this->denganTotal($klasifikasi->map(fn ($k) => ['id' => $k->id, 'nama' => $k->nama, ...$this->tabel($perKlasifikasi[$k->id])])->all(), $kl),
             'jenis' => $this->denganTotal($barisJenis, $jn),
+            'rencana' => $aturan,
         ];
+        if (! $aturan['tampil']) {
+            // Hidden is null ("–"), never 0: only the cells' rencana and persen keys are touched.
+            array_walk_recursive($hasil['irban'], fn (&$v, $k) => $v = in_array($k, ['rencana', 'persen'], true) ? null : $v);
+            array_walk_recursive($hasil['jenis'], fn (&$v, $k) => $v = in_array($k, ['rencana', 'persen'], true) ? null : $v);
+        }
+
+        return $hasil;
+    }
+
+    /**
+     * The one place of the spec 1.2 rule (input: SaringSpt::dari output), in priority order: kode arsip → hidden + C1; klasifikasi not
+     * wajib item PKPT → hidden + C1; wajib while more than one klasifikasi (active or not) is wajib → shown + C2; else shown, no note.
+     * Jenis never hides the rencana (items have a jenis).
+     *
+     * @return array{tampil: bool, catatan: ?string}
+     */
+    public function aturanRencana(array $saring): array
+    {
+        $klasifikasi = $saring['klasifikasi'] ?? null;
+        $wajib = fn () => Klasifikasi::where('wajib_item_pkpt', true);
+
+        return match (true) {
+            ($saring['kode_arsip'] ?? null) !== null,
+            $klasifikasi !== null && ! $wajib()->whereKey($klasifikasi)->exists() => ['tampil' => false, 'catatan' => self::CATATAN_TANPA_RENCANA],
+            $klasifikasi !== null && $wajib()->count() > 1 => ['tampil' => true, 'catatan' => self::CATATAN_RENCANA_GABUNG],
+            default => ['tampil' => true, 'catatan' => null],
+        };
     }
 
     /**

@@ -17,19 +17,23 @@ class RealisasiItemPkpt
     /**
      * An item is listed when its rencana quarter (RekapTriwulan::rencanaItem) is $tw, or when it has an accepted SPT whose
      * basis date falls in $tw (and $tahun). $tw = 0 means the whole year. SPT without an item never appear.
+     * $saring (1.3): SPT rows follow Spt::scopeSaring, items follow PkptItem::scopeSaring (jenis). When RekapTriwulan::aturanRencana
+     * hides the rencana (klasifikasi not wajib, kode arsip), an item is listed only through a matching SPT, never for its rencana alone.
      *
      * @return list<array{irban: array{id: int, nama: string}, item: list<array{item_id: int, jenis: array{nama: string, warna: string, warna_teks: string}, keterangan: ?string, mulai: CarbonImmutable, selesai: CarbonImmutable, direvisi: bool, spt: list<array>}>}>
      */
-    public function untuk(int $tahun, int $tw, ?int $irbanId): array
+    public function untuk(int $tahun, int $tw, ?int $irbanId, array $saring = []): array
     {
+        $saring = app(SaringSpt::class)->dari($saring);
+        $tampil = $this->rekap->aturanRencana($saring)['tampil'];
         $irbans = Irban::orderBy('id')->when($irbanId, fn ($q) => $q->whereKey($irbanId))->get(['id', 'nama']);
-        $items = PkptItem::aktif()->with('jenisPenugasan')
+        $items = PkptItem::aktif()->saring($saring)->with('jenisPenugasan')
             ->whereHas('pkpt', fn ($q) => $q->where('tahun', $tahun)->where('status', StatusPkpt::Disahkan))
             ->when($irbanId, fn ($q) => $q->where('irban_id', $irbanId))
             ->get();
 
         $spts = Spt::where('status_pengajuan', StatusPengajuan::Diterima)
-            ->whereIn('pkpt_item_id', $items->modelKeys())
+            ->whereIn('pkpt_item_id', $items->modelKeys())->saring($saring)
             ->tap(fn ($q) => $this->triwulan->batasi($q, $tahun, $tw ?: null))
             ->with(['irban:id,nama', 'jenisPenugasan', 'kendala'])
             ->orderBy('tanggal_mulai')->orderBy('id')->get();
@@ -40,7 +44,7 @@ class RealisasiItemPkpt
         foreach ($items as $item) {
             $rows = ($sptPerItem[$item->id] ?? collect())->map(fn ($s) => $baris[$s->id])->all();
             $rencana = $this->rekap->rencanaItem($item, $tahun);
-            if (! $rows && ! ($rencana && ($tw === 0 || $rencana[0] === $tw))) {
+            if (! $rows && ! ($tampil && $rencana && ($tw === 0 || $rencana[0] === $tw))) {
                 continue;
             }
             [$mulai, $selesai] = $this->kesesuaian->rentang($item);

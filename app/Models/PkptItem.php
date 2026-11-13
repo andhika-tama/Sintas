@@ -46,6 +46,14 @@ class PkptItem extends Model
         $query->whereNull('pkpt_item.target_spt');
     }
 
+    /** Rekap filter (SaringSpt::dari output, 1.3): items have no klasifikasi or kode arsip, so only `jenis` applies; 'lainnya' matches no item. */
+    public function scopeSaring(Builder $query, array $saring): void
+    {
+        $jenis = $saring['jenis'] ?? null;
+        $query->when($jenis === 'lainnya', fn ($q) => $q->whereRaw('1 = 0'))
+            ->when($jenis !== null && $jenis !== 'lainnya', fn ($q) => $q->where('pkpt_item.jenis_penugasan_id', $jenis));
+    }
+
     /** True when the dates differ from the snapshot taken at pengesahan. */
     public function direvisi(): bool
     {

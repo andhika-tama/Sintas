@@ -185,4 +185,25 @@ class GrafikPdfRekapTest extends TestCase
         $this->assertStringContainsString('color: '.PaletGrafik::TEKS_SEKUNDER.';', $html);
         $this->assertStringNotContainsString(PaletGrafik::TEKS, file_get_contents(resource_path('views/pdf/rekap-triwulan.blade.php')));
     }
+
+    /** 1.3 Task 2: hidden rencana → the rr chart draws Realisasi only, retitled; the % per jenis chart (needs a rencana) is left out. */
+    public function test_grafik_hanya_realisasi_bila_rencana_tidak_tampil(): void
+    {
+        $html = $this->html(['rr', 'klasifikasi', 'jenis'], ['klasifikasi' => $this->k]);
+        $rr = explode('data-grafik="klasifikasi"', explode('data-grafik="rr"', $html)[1])[0];
+        $this->assertStringContainsString('Grafik Realisasi per Irban', $rr);
+        $this->assertStringNotContainsString('Rencana', $rr);
+        $this->assertSame(2, substr_count($rr, 'class="grafik-nilai"')); // one bar value per irban
+        $this->assertStringNotContainsString('data-grafik="jenis"', $html);
+        $this->assertStringNotContainsString('Grafik Rencana vs Realisasi', $html);
+
+        $irban = $this->html(['rr'], ['klasifikasi' => $this->k, 'irban' => $this->a->id]);
+        $this->assertStringContainsString('Grafik Realisasi per Triwulan', $irban);
+
+        // Jenis keeps the rencana: unchanged titles and both series.
+        $jenis = $this->html(['rr', 'jenis'], ['jenis' => (string) $this->j1->id]);
+        $this->assertStringContainsString('Grafik Rencana vs Realisasi', $jenis);
+        $this->assertStringContainsString('data-grafik="jenis"', $jenis);
+        $this->assertStringContainsString('33% (2/6)', $jenis); // J1: 2 of 6
+    }
 }

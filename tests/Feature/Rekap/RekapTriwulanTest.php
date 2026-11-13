@@ -5,6 +5,7 @@ namespace Tests\Feature\Rekap;
 use App\Models\Irban;
 use App\Models\JenisPenugasan;
 use App\Models\Klasifikasi;
+use App\Models\KodeArsip;
 use App\Models\Pkpt;
 use App\Models\PkptItem;
 use App\Models\Spt;
@@ -237,5 +238,166 @@ class RekapTriwulanTest extends TestCase
         $tanpa = collect($jenis['baris'])->last();
         $this->assertSame('Tanpa jenis penugasan', $tanpa['nama']);
         $this->assertSame(['rencana' => 2, 'realisasi' => 1, 'persen' => 50, 'jumlah' => 1], $tanpa['tw'][2]);
+    }
+
+    /** 1.3 Task 2: with no filter the output (minus the new `rencana` key) equals the pre-1.3 output, captured in the snapshot file. */
+    public function test_tanpa_filter_sama_dengan_sebelum_1_3(): void
+    {
+        $tanpaId = function (array $a) use (&$tanpaId) {
+            unset($a['id'], $a['kode_nomor']);
+
+            return array_map(fn ($v) => is_array($v) ? $tanpaId($v) : $v, $a);
+        };
+        $snap = json_decode(file_get_contents(__DIR__.'/snapshot/rekap-2026-tanpa-filter.json'), true);
+        $semua = app(RekapTriwulan::class)->hitung(2026);
+        $irbanB = app(RekapTriwulan::class)->hitung(2026, $this->b->id, ['klasifikasi' => null, 'kode_arsip' => null, 'jenis' => null]);
+        foreach ([$semua, $irbanB] as $r) {
+            $this->assertSame(['tampil' => true, 'catatan' => null], $r['rencana']);
+        }
+        unset($semua['rencana'], $irbanB['rencana']);
+        $this->assertSame($snap['semua'], json_decode(json_encode($tanpaId($semua)), true));
+        $this->assertSame($snap['irban_b'], json_decode(json_encode($tanpaId($irbanB)), true));
+    }
+
+    /** Extra KHUSUS SPT on item a1, Selesai 1–5 Mar (TW I, Irban A, J1): realisasi without filter, gone under REGULER. */
+    private function sptKhususBerItem(): Spt
+    {
+        return Spt::factory()->selesai()->create(['irban_id' => $this->a->id, 'pkpt_item_id' => PkptItem::where('irban_id', $this->a->id)->where('target_spt', 2)->value('id'),
+            'jenis_penugasan_id' => $this->j1->id, 'klasifikasi_id' => $this->k, 'tanggal_mulai' => '2026-03-01', 'tanggal_selesai' => '2026-03-05']);
+    }
+
+    public function test_aturan_rencana_per_baris_tabel_spec(): void
+    {
+        $aturan = fn (array $s) => app(RekapTriwulan::class)->aturanRencana(['klasifikasi' => null, 'kode_arsip' => null, 'jenis' => null, ...$s]);
+        $kode = KodeArsip::factory()->create(['kode' => '890'])->id;
+        $c1 = RekapTriwulan::CATATAN_TANPA_RENCANA;
+        $this->assertSame('Rencana PKPT tidak dapat difilter berdasarkan klasifikasi atau kode arsip, sehingga tidak ditampilkan.', $c1);
+        $this->assertSame('Rencana mencakup semua klasifikasi yang wajib item PKPT.', RekapTriwulan::CATATAN_RENCANA_GABUNG);
+
+        $this->assertSame(['tampil' => true, 'catatan' => null], $aturan([]));
+        $this->assertSame(['tampil' => true, 'catatan' => null], $aturan(['jenis' => $this->j1->id]));
+        $this->assertSame(['tampil' => true, 'catatan' => null], $aturan(['jenis' => 'lainnya']));
+        $this->assertSame(['tampil' => true, 'catatan' => null], $aturan(['klasifikasi' => $this->r]));
+        $this->assertSame(['tampil' => false, 'catatan' => $c1], $aturan(['klasifikasi' => $this->k]));
+        $this->assertSame(['tampil' => false, 'catatan' => $c1], $aturan(['kode_arsip' => $kode]));
+        $this->assertSame(['tampil' => false, 'catatan' => $c1], $aturan(['kode_arsip' => $kode, 'klasifikasi' => $this->r])); // kode arsip first
+        $this->assertSame(['tampil' => false, 'catatan' => $c1], $aturan(['kode_arsip' => $kode, 'jenis' => $this->j1->id]));
+
+        // A second wajib klasifikasi, even inactive, makes the rencana not splittable: shown in full with C2.
+        Klasifikasi::whereKey($this->k)->update(['wajib_item_pkpt' => true, 'aktif' => false]);
+        $this->assertSame(['tampil' => true, 'catatan' => RekapTriwulan::CATATAN_RENCANA_GABUNG], $aturan(['klasifikasi' => $this->r]));
+        $this->assertSame(['tampil' => true, 'catatan' => RekapTriwulan::CATATAN_RENCANA_GABUNG], $aturan(['klasifikasi' => $this->k]));
+        $this->assertSame(['tampil' => false, 'catatan' => $c1], $aturan(['klasifikasi' => $this->r, 'kode_arsip' => $kode]));
+        $this->assertSame(['tampil' => true, 'catatan' => null], $aturan([]));
+    }
+
+    public function test_filter_jenis_rencana_hanya_item_jenis_itu(): void
+    {
+        $rekap = app(RekapTriwulan::class)->hitung(2026, null, ['jenis' => (string) $this->j1->id]);
+        $this->assertSame(['tampil' => true, 'catatan' => null], $rekap['rencana']);
+        $irban = $this->sel($rekap['irban']['baris']);
+        // J1 items: a1 TW I 2, a3 TW IV 3 (A); b2 TW III 1 (B). Realisasi J1 Selesai with item: s1 TW I, s5 TW IV (A); s4 is non-PKPT.
+        // A: rencana 2,0,0,3 = 5; realisasi 1,0,0,1 = 2; persen 50, –, –, 33; total 40.
+        $this->assertSame($this->rr([[2, 1, 50], [0, 0, null], [0, 0, null], [3, 1, 33]], [5, 2, 40]), $irban[$this->a->id]);
+        // B: rencana TW III 1, s9 berjalan → 0%; total 0.
+        $this->assertSame($this->rr([[0, 0, null], [0, 0, null], [1, 0, 0], [0, 0, null]], [1, 0, 0]), $irban[$this->b->id]);
+        $this->assertSame($this->rr([[2, 1, 50], [0, 0, null], [1, 0, 0], [3, 1, 33]], [6, 2, 33]), $rekap['irban']['total']);
+        // Klasifikasi: J1 SPT only. REGULER s1 S + s2 B (TW I), s9 B (TW III), s5 S (TW IV); KHUSUS s4 S (TW II).
+        $kl = $this->sel($rekap['klasifikasi']['baris']);
+        $this->assertSame($this->kl([[2, 1, 1], [0, 0, 0], [1, 1, 0], [1, 0, 1]], [4, 2, 2]), $kl[$this->r]);
+        $this->assertSame($this->kl([[0, 0, 0], [1, 0, 1], [0, 0, 0], [0, 0, 0]], [1, 0, 1]), $kl[$this->k]);
+        // Jenis: J1 row as without filter; J2 has neither rencana nor SPT.
+        $jn = $this->sel($rekap['jenis']['baris']);
+        $this->assertSame($this->jn([[2, 1, 50, 2], [0, 0, null, 1], [1, 0, 0, 1], [3, 1, 33, 1]], [6, 2, 33, 5]), $jn[$this->j1->id]);
+        $this->assertSame($this->jn([[0, 0, null, 0], [0, 0, null, 0], [0, 0, null, 0], [0, 0, null, 0]], [0, 0, null, 0]), $jn[$this->j2->id]);
+
+        // Jenis Lainnya: items never have it → rencana 0 (shown, not "–"); the free-text SPT counts in the Lainnya row.
+        Spt::factory()->selesai()->create(['irban_id' => $this->a->id, 'pkpt_item_id' => null, 'jenis_penugasan_id' => null, 'jenis_penugasan_lainnya' => 'Audit X',
+            'klasifikasi_id' => $this->k, 'tanggal_mulai' => '2026-02-01', 'tanggal_selesai' => '2026-02-10']);
+        $lain = app(RekapTriwulan::class)->hitung(2026, null, ['jenis' => 'lainnya']);
+        $this->assertSame(['tampil' => true, 'catatan' => null], $lain['rencana']);
+        $this->assertSame($this->rr([[0, 0, null], [0, 0, null], [0, 0, null], [0, 0, null]], [0, 0, null]), $lain['irban']['total']);
+        $this->assertSame(1, $lain['klasifikasi']['total']['total']['jumlah']);
+        $this->assertSame(['rencana' => 0, 'realisasi' => 0, 'persen' => null, 'jumlah' => 1], collect($lain['jenis']['baris'])->firstWhere('nama', 'Lainnya')['total']);
+    }
+
+    public function test_filter_klasifikasi_wajib_rencana_penuh_realisasi_tersaring(): void
+    {
+        $this->sptKhususBerItem();
+        // Control: without a filter the KHUSUS SPT on a1 is realisasi in A's TW I (1 → 2).
+        $this->assertSame(['rencana' => 2, 'realisasi' => 2, 'persen' => 100], $this->sel(app(RekapTriwulan::class)->hitung(2026)['irban']['baris'])[$this->a->id]['tw'][1]);
+
+        $rekap = app(RekapTriwulan::class)->hitung(2026, null, ['klasifikasi' => (string) $this->r]);
+        $this->assertSame(['tampil' => true, 'catatan' => null], $rekap['rencana']);
+        $irban = $this->sel($rekap['irban']['baris']);
+        // Rencana unchanged (A 2,1,0,3; B 0,2,1,0); realisasi REGULER only: A s1, s3, s5; B s6.
+        $this->assertSame($this->rr([[2, 1, 50], [1, 1, 100], [0, 0, null], [3, 1, 33]], [6, 3, 50]), $irban[$this->a->id]);
+        $this->assertSame($this->rr([[0, 0, null], [2, 1, 50], [1, 0, 0], [0, 0, null]], [3, 1, 33]), $irban[$this->b->id]);
+        $kl = $this->sel($rekap['klasifikasi']['baris']);
+        $this->assertSame($this->kl([[0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0]], [0, 0, 0]), $kl[$this->k]);
+        $this->assertSame($this->kl([[2, 1, 1], [2, 0, 2], [1, 1, 0], [1, 0, 1]], [6, 2, 4]), $kl[$this->r]);
+        // Jenis jumlah without the KHUSUS SPT (s4, s10, extra): J1 2,0,1,1; J2 0,2,0,0.
+        $jn = $this->sel($rekap['jenis']['baris']);
+        $this->assertSame($this->jn([[2, 1, 50, 2], [0, 0, null, 0], [1, 0, 0, 1], [3, 1, 33, 1]], [6, 2, 33, 4]), $jn[$this->j1->id]);
+        $this->assertSame($this->jn([[0, 0, null, 0], [3, 2, 67, 2], [0, 0, null, 0], [0, 0, null, 0]], [3, 2, 67, 2]), $jn[$this->j2->id]);
+    }
+
+    public function test_filter_klasifikasi_tidak_wajib_rencana_dan_persen_null_dengan_c1(): void
+    {
+        $this->sptKhususBerItem();
+        $rekap = app(RekapTriwulan::class)->hitung(2026, null, ['klasifikasi' => (string) $this->k]);
+        $this->assertSame(['tampil' => false, 'catatan' => RekapTriwulan::CATATAN_TANPA_RENCANA], $rekap['rencana']);
+        $irban = $this->sel($rekap['irban']['baris']);
+        // KHUSUS Selesai with an item: only the extra SPT (A, TW I). Rencana and persen null in every cell, totals too.
+        $this->assertSame($this->rr([[null, 1, null], [null, 0, null], [null, 0, null], [null, 0, null]], [null, 1, null]), $irban[$this->a->id]);
+        $this->assertSame($this->rr([[null, 0, null], [null, 0, null], [null, 0, null], [null, 0, null]], [null, 0, null]), $irban[$this->b->id]);
+        $this->assertSame($this->rr([[null, 1, null], [null, 0, null], [null, 0, null], [null, 0, null]], [null, 1, null]), $rekap['irban']['total']);
+        // KHUSUS: extra S (TW I), s4 S (TW II), s10 B (TW IV).
+        $this->assertSame($this->kl([[1, 0, 1], [1, 0, 1], [0, 0, 0], [1, 1, 0]], [3, 1, 2]), $this->sel($rekap['klasifikasi']['baris'])[$this->k]);
+        $jn = $this->sel($rekap['jenis']['baris']);
+        $this->assertSame($this->jn([[null, 1, null, 1], [null, 0, null, 1], [null, 0, null, 0], [null, 0, null, 0]], [null, 1, null, 2]), $jn[$this->j1->id]);
+        $this->assertSame($this->jn([[null, 0, null, 0], [null, 0, null, 0], [null, 0, null, 0], [null, 0, null, 1]], [null, 0, null, 1]), $jn[$this->j2->id]);
+        $this->assertSame($this->jn([[null, 1, null, 1], [null, 0, null, 1], [null, 0, null, 0], [null, 0, null, 1]], [null, 1, null, 3]), $rekap['jenis']['total']);
+    }
+
+    public function test_filter_kode_arsip_rencana_null_dengan_c1_dan_kombinasi_jenis(): void
+    {
+        $kode = KodeArsip::factory()->create(['kode' => '890'])->id;
+        // s5 (A a3 J1 R, Selesai 5–15 Okt) and s10 (B K J2, berjalan 1–5 Nov) get kode 890.
+        Spt::whereDate('tanggal_mulai', '2026-10-05')->update(['kode_arsip_id' => $kode]);
+        Spt::whereDate('tanggal_mulai', '2026-11-01')->update(['kode_arsip_id' => $kode]);
+
+        $rekap = app(RekapTriwulan::class)->hitung(2026, null, ['kode_arsip' => (string) $kode]);
+        $this->assertSame(['tampil' => false, 'catatan' => RekapTriwulan::CATATAN_TANPA_RENCANA], $rekap['rencana']);
+        $irban = $this->sel($rekap['irban']['baris']);
+        $this->assertSame($this->rr([[null, 0, null], [null, 0, null], [null, 0, null], [null, 1, null]], [null, 1, null]), $irban[$this->a->id]);
+        $this->assertSame($this->rr([[null, 0, null], [null, 0, null], [null, 0, null], [null, 0, null]], [null, 0, null]), $irban[$this->b->id]);
+        $kl = $this->sel($rekap['klasifikasi']['baris']);
+        $this->assertSame($this->kl([[0, 0, 0], [0, 0, 0], [0, 0, 0], [1, 0, 1]], [1, 0, 1]), $kl[$this->r]);
+        $this->assertSame($this->kl([[0, 0, 0], [0, 0, 0], [0, 0, 0], [1, 1, 0]], [1, 1, 0]), $kl[$this->k]);
+
+        // Kode arsip + jenis J2: still C1; only s10 (non-PKPT, berjalan) → jumlah 1, realisasi 0.
+        $kombinasi = app(RekapTriwulan::class)->hitung(2026, null, ['kode_arsip' => (string) $kode, 'jenis' => (string) $this->j2->id]);
+        $this->assertSame(['tampil' => false, 'catatan' => RekapTriwulan::CATATAN_TANPA_RENCANA], $kombinasi['rencana']);
+        $this->assertSame($this->rr([[null, 0, null], [null, 0, null], [null, 0, null], [null, 0, null]], [null, 0, null]), $kombinasi['irban']['total']);
+        $this->assertSame($this->jn([[null, 0, null, 0], [null, 0, null, 0], [null, 0, null, 0], [null, 0, null, 1]], [null, 0, null, 1]), $this->sel($kombinasi['jenis']['baris'])[$this->j2->id]);
+        $this->assertSame(0, $this->sel($kombinasi['jenis']['baris'])[$this->j1->id]['total']['jumlah']);
+    }
+
+    public function test_dua_klasifikasi_wajib_rencana_penuh_dengan_c2(): void
+    {
+        Klasifikasi::whereKey($this->k)->update(['wajib_item_pkpt' => true, 'aktif' => false]);
+        $rekap = app(RekapTriwulan::class)->hitung(2026, null, ['klasifikasi' => (string) $this->r]);
+        $this->assertSame(['tampil' => true, 'catatan' => RekapTriwulan::CATATAN_RENCANA_GABUNG], $rekap['rencana']);
+        // Rencana is the full 9 (not split); realisasi REGULER only (all fixture realisasi is REGULER).
+        $this->assertSame($this->rr([[2, 1, 50], [3, 2, 67], [1, 0, 0], [3, 1, 33]], [9, 4, 44]), $rekap['irban']['total']);
+    }
+
+    /** Values are re-validated inside hitung(): unknown ids are ignored (no filter, no C1). */
+    public function test_nilai_saring_tak_dikenal_diabaikan(): void
+    {
+        $rekap = app(RekapTriwulan::class)->hitung(2026, null, ['klasifikasi' => '99999', 'kode_arsip' => 'x', 'jenis' => '-1']);
+        $this->assertSame(['tampil' => true, 'catatan' => null], $rekap['rencana']);
+        $this->assertSame($this->rr([[2, 1, 50], [3, 2, 67], [1, 0, 0], [3, 1, 33]], [9, 4, 44]), $rekap['irban']['total']);
     }
 }

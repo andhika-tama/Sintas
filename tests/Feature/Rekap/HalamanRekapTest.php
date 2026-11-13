@@ -4,6 +4,7 @@ namespace Tests\Feature\Rekap;
 
 use App\Enums\Role;
 use App\Livewire\Rekap;
+use App\Models\Klasifikasi;
 use App\Models\Pkpt;
 use App\Models\Spt;
 use App\Models\User;
@@ -182,7 +183,7 @@ class HalamanRekapTest extends TestCase
     {
         $p = app(PembangunRekap::class);
         $f = $p->filter($this->irbanA, ['tahun' => '2026', 'irban' => (string) $this->b->id]);
-        $this->assertSame(['tahun' => 2026, 'tw' => 0, 'irban' => $this->a->id, 'bagian' => ['rr', 'klasifikasi', 'jenis']], $f);
+        $this->assertSame(['tahun' => 2026, 'tw' => 0, 'irban' => $this->a->id, 'bagian' => ['rr', 'klasifikasi', 'jenis'], 'saring' => ['klasifikasi' => null, 'kode_arsip' => null, 'jenis' => null]], $f);
         $this->assertSame('rekap-triwulan-2026-irban-'.$this->a->kode_nomor.'-rr-klasifikasi-jenis', $p->namaFile($this->irbanA, $f));
 
         $r = app(Ekspor::class)->minta($this->irbanA, 'rekap', 'xlsx', ['irban' => (string) $this->b->id]);
@@ -195,7 +196,8 @@ class HalamanRekapTest extends TestCase
     public function test_builder_validates_and_authorizes(): void
     {
         $p = app(PembangunRekap::class);
-        $this->assertSame(['tahun' => 2026, 'tw' => 0, 'irban' => null, 'bagian' => ['rr', 'klasifikasi', 'jenis']], $p->filter($this->pimpinan, ['tahun' => 'abc', 'tw' => '7', 'irban' => '999']));
+        $this->assertSame(['tahun' => 2026, 'tw' => 0, 'irban' => null, 'bagian' => ['rr', 'klasifikasi', 'jenis'], 'saring' => ['klasifikasi' => null, 'kode_arsip' => null, 'jenis' => null]],
+            $p->filter($this->pimpinan, ['tahun' => 'abc', 'tw' => '7', 'irban' => '999', 'klasifikasi' => '99999', 'jenis' => 'x']));
         $this->assertSame('/pimpinan/rekap', $p->halaman($this->pimpinan));
 
         $this->expectException(AuthorizationException::class);
@@ -273,11 +275,11 @@ class HalamanRekapTest extends TestCase
                 parent::__construct($tw);
             }
 
-            public function hitung(int $tahun, ?int $irbanId = null): array
+            public function hitung(int $tahun, ?int $irbanId = null, array $saring = []): array
             {
                 $this->dihitung[] = $tahun;
 
-                return parent::hitung($tahun, $irbanId);
+                return parent::hitung($tahun, $irbanId, $saring);
             }
         });
 
@@ -290,5 +292,80 @@ class HalamanRekapTest extends TestCase
         $t->set('tab', 'detail')->assertSee('Detail Realisasi')->assertDontSee('belum disahkan');
         $t->set('tahun', '2031')->assertSee('PKPT 2031 belum disahkan');
         $this->assertCount(0, $dihitung);
+    }
+
+    /** 1.3 Task 2: "–" and the note only when the rule hides the rencana; numbers are those of RekapTriwulanTest (fixture without extra SPT). */
+    public function test_saring_di_layar_tanda_dan_catatan_hanya_bila_relevan(): void
+    {
+        $c1 = RekapTriwulan::CATATAN_TANPA_RENCANA;
+        $polos = $this->halaman($this->pimpinan, ['tab' => 'gabungan']);
+        $polos->assertDontSee($c1)->assertDontSee(RekapTriwulan::CATATAN_RENCANA_GABUNG)->assertSee('Filter lainnya')
+            ->assertSeeHtml('id="rekap-klasifikasi"')->assertSeeHtml('id="rekap-kode_arsip"')->assertSeeHtml('id="rekap-jenis"')
+            ->assertSee('Semua klasifikasi')->assertSee('Semua kode arsip')->assertSee('Semua jenis');
+
+        // KHUSUS (not wajib): KHUSUS SPT have no item → realisasi 0; Per Klasifikasi KHUSUS s4 S + s10 B; Per Jenis jumlah J1 s4, J2 s10.
+        $t = $this->halaman($this->pimpinan, ['tab' => 'gabungan', 'klasifikasi' => (string) $this->k]);
+        $t->assertSee($c1);
+        $b = $this->baris($t->html());
+        foreach (['TW I – 0 –', 'TW IV – 0 –', 'Total – 0 –', 'KHUSUS 2 1 1', 'REGULER 0 0 0', 'Jenis Satu – 0 – 1', 'Jenis Dua – 0 – 1', 'Total – 0 – 2'] as $r) {
+            $this->assertContains($r, $b, $r);
+        }
+        $this->assertSame(2, substr_count($t->html(), $c1)); // under Rencana vs Realisasi and under Per Jenis Penugasan
+
+        // Jenis J2: rencana a2 + b1 = 3 in TW II, realisasi s3 + s6 → 67%; no note.
+        $t = $this->halaman($this->pimpinan, ['tab' => 'gabungan', 'jenis' => (string) $this->j2->id]);
+        $t->assertDontSee($c1);
+        $b = $this->baris($t->html());
+        foreach (['TW I 0 0 –', 'TW II 3 2 67', 'Total 3 2 67', 'Jenis Dua 3 2 67 3', 'Jenis Satu 0 0 – 0'] as $r) {
+            $this->assertContains($r, $b, $r);
+        }
+
+        // C2: two wajib klasifikasi (one inactive) → full rencana with the C2 note.
+        Klasifikasi::whereKey($this->k)->update(['wajib_item_pkpt' => true, 'aktif' => false]);
+        $t = $this->halaman($this->pimpinan, ['tab' => 'gabungan', 'klasifikasi' => (string) $this->r]);
+        $t->assertSee(RekapTriwulan::CATATAN_RENCANA_GABUNG)->assertDontSee($c1);
+        $this->assertContains('Total 9 4 44', $this->baris($t->html()));
+    }
+
+    public function test_saring_url_divalidasi_ditulis_balik_dan_atur_ulang(): void
+    {
+        $t = Livewire::withQueryParams(['klasifikasi' => '99999', 'kode_arsip' => 'abc', 'jenis' => 'lainnya', 'tw' => '2'])->actingAs($this->pimpinan)->test(Rekap::class);
+        $t->assertOk()->assertSet('klasifikasi', '')->assertSet('kode_arsip', '')->assertSet('jenis', 'lainnya');
+        $this->assertSame(['Lainnya'], array_slice(array_values($t->viewData('saringOpsi')['jenis']), -1));
+
+        $t->set('klasifikasi', (string) $this->k)->assertSet('klasifikasi', (string) $this->k)
+            ->call('aturUlang')->assertSet('klasifikasi', '')->assertSet('jenis', '')->assertSet('tw', '')->assertSet('tahun', '2026');
+    }
+
+    /** Review Focus 1: an Irban tampering `irban=` together with the new filters stays on its own irban; fictitious ids are ignored without a 500. */
+    public function test_irban_dengan_irban_lain_dan_saring_tetap_irbannya(): void
+    {
+        $t = Livewire::withQueryParams(['irban' => (string) $this->b->id, 'jenis' => 'lainnya', 'klasifikasi' => '99999'])->actingAs($this->irbanA)->test(Rekap::class);
+        $t->assertOk()->assertSet('klasifikasi', '')->assertSet('jenis', 'lainnya')->assertSee('Irban A')->assertDontSee('Irban B');
+
+        // REGULER (wajib): A's numbers only — rencana 6, realisasi s1 s3 s5 → Total 6 3 50; never B's Total 3 1 33.
+        $t = Livewire::withQueryParams(['irban' => (string) $this->b->id, 'klasifikasi' => (string) $this->r])->actingAs($this->irbanA)->test(Rekap::class);
+        $b = $this->baris($t->html());
+        $this->assertContains('Total 6 3 50', $b);
+        $this->assertNotContains('Total 3 1 33', $b);
+
+        $p = app(PembangunRekap::class);
+        $f = $p->filter($this->irbanA, ['irban' => (string) $this->b->id, 'klasifikasi' => (string) $this->r, 'jenis' => 'lainnya', 'kode_arsip' => '0']);
+        $this->assertSame($this->a->id, $f['irban']);
+        $this->assertSame(['klasifikasi' => $this->r, 'kode_arsip' => null, 'jenis' => 'lainnya'], $f['saring']);
+    }
+
+    public function test_ekspor_dari_halaman_membawa_saring(): void
+    {
+        $t = $this->halaman($this->pimpinan, ['klasifikasi' => (string) $this->k, 'jenis' => (string) $this->j2->id]);
+        $t->call('bukaEkspor', 'xlsx')->call('unduhEkspor')->assertFileDownloaded('rekap-triwulan-2026-klasifikasi-khusus-jenis-jenis-dua-rr-klasifikasi-jenis.xlsx');
+
+        $r = app(Ekspor::class)->minta($this->pimpinan, 'rekap', 'xlsx', ['tahun' => '2026', 'klasifikasi' => (string) $this->k, 'jenis' => (string) $this->j2->id]);
+        $rows = $this->rowsXlsx($r);
+        $this->assertSame('Rekap Triwulanan 2026 · Klasifikasi: KHUSUS · Jenis: Jenis Dua', $rows[0]);
+        // KHUSUS + J2: s10 (B, berjalan, TW IV) only.
+        $this->assertContains('Gabungan Total – 0 –', $rows);
+        $this->assertContains('Jenis Dua Setahun – 0 – 1', $rows);
+        $this->assertContains(RekapTriwulan::CATATAN_TANPA_RENCANA, $rows);
     }
 }

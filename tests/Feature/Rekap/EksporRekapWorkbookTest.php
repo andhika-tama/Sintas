@@ -7,6 +7,7 @@ use App\Exports\RekapSheet;
 use App\Jobs\BuatEkspor;
 use App\Models\Ekspor as EksporModel;
 use App\Models\Irban;
+use App\Models\KodeArsip;
 use App\Models\Spt;
 use App\Models\User;
 use App\Services\Ekspor;
@@ -319,11 +320,11 @@ class EksporRekapWorkbookTest extends TestCase
                 parent::__construct($tw);
             }
 
-            public function hitung(int $tahun, ?int $irbanId = null): array
+            public function hitung(int $tahun, ?int $irbanId = null, array $saring = []): array
             {
                 $this->panggilan[] = "{$tahun}|{$irbanId}";
 
-                return parent::hitung($tahun, $irbanId);
+                return parent::hitung($tahun, $irbanId, $saring);
             }
         });
         $p = app(PembangunRekap::class);
@@ -359,5 +360,102 @@ class EksporRekapWorkbookTest extends TestCase
         $this->assertContains('Selesai', $sel);
         $semua = array_merge(...array_map(fn ($sh) => array_merge(...$sh->toArray(null, true, true, false)), $this->buku($this->pimpinan, ['bagian' => ['detail']])->getAllSheets()));
         $this->assertTrue(count(array_filter($semua, fn ($c) => is_string($c) && str_ends_with($c, ', Terlambat'))) > 0, 'A late SPT row shows ", Terlambat" after its status.');
+    }
+
+    /** 1.3 Task 2: hidden rencana cells are the text "–" (not 0, not empty) and the C1 note is a Catatan section under the table. */
+    public function test_saring_sel_tanda_sebagai_teks_dan_catatan_di_bawah_tabel(): void
+    {
+        $polos = $this->buku($this->pimpinan, []);
+        foreach ($polos->getAllSheets() as $s) {
+            $this->assertNotContains(RekapTriwulan::CATATAN_TANPA_RENCANA, $this->teks($s));
+        }
+
+        $buku = $this->buku($this->pimpinan, ['klasifikasi' => $this->k]);
+        $s = $buku->getSheetByName('Gabungan');
+        $this->assertSame('Rekap Triwulanan 2026 · Klasifikasi: KHUSUS', $s->getCell('A1')->getValue());
+        $this->assertSame(['Gabungan', 'Total', '–', 0, '–'], array_slice($this->baris($s, 'Gabungan', 'Total'), 0, 5));
+        foreach ($s->getRowIterator() as $row) {
+            if ($s->getCell('A'.$row->getRowIndex())->getValue() === 'Gabungan' && $s->getCell('B'.$row->getRowIndex())->getValue() === 'Total') {
+                $this->assertSame(DataType::TYPE_STRING, $s->getCell('C'.$row->getRowIndex())->getDataType());
+            }
+        }
+        $teks = $this->teks($s);
+        // Rencana vs Realisasi (+ Ringkasan per Irban) and Per Jenis each end with a Catatan carrying C1.
+        $this->assertSame(2, count(array_keys($teks, RekapTriwulan::CATATAN_TANPA_RENCANA, true)));
+        $this->assertLessThan(array_search('Per Klasifikasi', $teks, true), array_search(RekapTriwulan::CATATAN_TANPA_RENCANA, $teks, true));
+        $this->assertSame(['Irban A', '–', 0, '–'], array_slice($this->barisRingkasan($s, 'Irban A'), 0, 4));
+        $this->assertContains(RekapTriwulan::CATATAN_TANPA_RENCANA, $this->teks($buku->getSheetByName('Irban A')));
+        $this->assertNotContains(PembangunRekap::CATATAN_TARGET, $teks); // the target note is about rencana, which is hidden
+    }
+
+    /** Row of "Ringkasan per Irban" (columns Irban, Rencana, Realisasi, %) for $nama. */
+    private function barisRingkasan(Worksheet $s, string $nama): array
+    {
+        $rows = $s->toArray(null, true, false, false);
+        $mulai = array_search('Ringkasan per Irban', array_column($rows, 0), true);
+        foreach (array_slice($rows, $mulai) as $row) {
+            if ($row[0] === $nama) {
+                return $row;
+            }
+        }
+        $this->fail("Ringkasan {$nama} tidak ada");
+    }
+
+    public function test_nama_file_memuat_saring(): void
+    {
+        $p = app(PembangunRekap::class);
+        $kode = KodeArsip::where('kode', '700')->value('id');
+        $nama = fn (array $f) => $p->namaFile($this->pimpinan, $p->filter($this->pimpinan, ['tahun' => 2026, ...$f]));
+        $this->assertSame('rekap-triwulan-2026-rr-klasifikasi-jenis', $nama([]));
+        $this->assertSame('rekap-triwulan-2026-klasifikasi-reguler-kode-arsip-700-pengawasan-umum-jenis-lainnya-rr', $nama(['klasifikasi' => $this->r, 'kode_arsip' => $kode, 'jenis' => 'lainnya', 'bagian' => ['rr']]));
+        $this->assertSame('rekap-triwulan-2026-jenis-jenis-satu', $nama(['jenis' => (string) $this->j1->id, 'klasifikasi' => '99999', 'bagian' => PembangunRekap::BAGIAN]));
+    }
+
+    /** Review Focus 2: the queued job rebuilds the filter through filter(), so the stored `saring` is applied and re-validated. */
+    public function test_ekspor_antre_membawa_dan_memvalidasi_ulang_saring(): void
+    {
+        Queue::fake();
+        Storage::fake('local');
+        $this->app->bind(PembangunRekap::class, fn () => new class(app(RekapTriwulan::class), app(RealisasiItemPkpt::class)) extends PembangunRekap
+        {
+            public function jumlah(User $u, array $f): int
+            {
+                return Ekspor::BATAS_LANGSUNG + 1;
+            }
+        });
+
+        $this->assertNull(app(Ekspor::class)->minta($this->pimpinan, 'rekap', 'xlsx', ['tahun' => 2026, 'klasifikasi' => (string) $this->k, 'kode_arsip' => '99999', 'bagian' => ['rr']]));
+        $e = EksporModel::sole();
+        $this->assertSame(['klasifikasi' => $this->k, 'kode_arsip' => null, 'jenis' => null], $e->filter['saring']);
+        $this->assertSame('rekap-triwulan-2026-klasifikasi-khusus-rr.xlsx', $e->nama_file);
+
+        Notification::fake();
+        app()->call([new BuatEkspor($e), 'handle']);
+        $s = IOFactory::load(Storage::disk('local')->path($e->fresh()->path))->getSheetByName('Gabungan');
+        $this->assertSame(['Gabungan', 'Total', '–', 0, '–'], $this->baris($s, 'Gabungan', 'Total'));
+        $this->assertContains(RekapTriwulan::CATATAN_TANPA_RENCANA, $this->teks($s));
+
+        // A stored id that no longer exists is ignored when the job re-validates (no filter, no note, no failure).
+        $e2 = EksporModel::create(['user_id' => $this->pimpinan->id, 'jenis' => 'rekap', 'format' => 'xlsx', 'nama_file' => 'x.xlsx', 'status' => 'menunggu',
+            'filter' => [...$e->filter, 'saring' => ['klasifikasi' => 99999, 'kode_arsip' => null, 'jenis' => null]]]);
+        app()->call([new BuatEkspor($e2), 'handle']);
+        $s = IOFactory::load(Storage::disk('local')->path($e2->fresh()->path))->getSheetByName('Gabungan');
+        $this->assertSame(['Gabungan', 'Total', 9, 4, 44], $this->baris($s, 'Gabungan', 'Total'));
+        $this->assertSame('selesai', $e2->fresh()->status);
+    }
+
+    public function test_pdf_saring_ringkasan_dan_catatan(): void
+    {
+        $p = app(PembangunRekap::class);
+        $html = $p->html($this->pimpinan, $p->filter($this->pimpinan, ['tahun' => 2026, 'kode_arsip' => KodeArsip::where('kode', '700')->value('id'), 'jenis' => (string) $this->j1->id]));
+        $this->assertStringContainsString('Kode Arsip: 700 · Pengawasan Umum', $html);
+        $this->assertStringContainsString('Jenis: Jenis Satu', $html);
+        $this->assertSame(2, substr_count($html, RekapTriwulan::CATATAN_TANPA_RENCANA));
+        $this->assertStringNotContainsString(PembangunRekap::CATATAN_TARGET, $html);
+        $this->assertStringStartsWith('%PDF', Pdf::loadHTML($html)->setPaper('a4', 'landscape')->output());
+
+        $polos = $p->html($this->pimpinan, $p->filter($this->pimpinan, ['tahun' => 2026]));
+        $this->assertStringNotContainsString(RekapTriwulan::CATATAN_TANPA_RENCANA, $polos);
+        $this->assertStringNotContainsString('Klasifikasi: ', $polos);
     }
 }

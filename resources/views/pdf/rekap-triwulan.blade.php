@@ -40,7 +40,7 @@
 </head>
 <body>
     <h1>Rekap Triwulanan {{ $tahun }}</h1>
-    <p>{{ $tw }}{{ $irban ? ' · Irban: '.$irban : '' }}</p>
+    <p>{{ implode(' · ', [$tw, ...($irban ? ['Irban: '.$irban] : []), ...($saring ?? [])]) }}</p>
     <p>Dibuat {{ $dibuat }}</p>
     @unless ($pkptDisahkan)
         <p>PKPT {{ $tahun }} belum disahkan; rencana belum dapat dihitung.</p>
@@ -64,6 +64,9 @@
         {{-- Task 6 1.1.4: notes only when relevant (catatanTarget = the section code that carries it). --}}
         @if (($catatanTarget ?? null) === $s['kode'])
             <p class="catatan">{{ \App\Services\Ekspor\PembangunRekap::CATATAN_TARGET }}</p>
+        @endif
+        @if ($catatan = \App\Services\Ekspor\PembangunRekap::catatanRencana($rekap ?? [], $s['kode']))
+            <p class="catatan">{{ $catatan }}</p>
         @endif
         @if (collect($s['tabel'])->pluck('baris')->flatten(1)->contains(fn ($b) => is_int($b['lebih'] ?? null)))
             <p class="catatan">{{ \App\Services\Ekspor\PembangunRekap::CATATAN_LEBIH }}</p>

@@ -9,11 +9,24 @@
         </x-slot:actions>
     </x-ui.page-header>
 
-    <div class="mb-4 flex flex-wrap items-end gap-3">
+    {{-- 1.3: Klasifikasi / Kode Arsip / Jenis sit inline from 768; below that they fold into the "Filter lainnya" disclosure (open on load when one is set).
+         wire:ignore.self keeps the Alpine-toggled class across morphs; the selects inside still update. --}}
+    @php $jumlahLainnya = count(array_filter([$this->klasifikasi, $this->kode_arsip, $this->jenis], fn ($v) => $v !== '')); @endphp
+    <div class="mb-4 flex flex-wrap items-end gap-3" x-data="{ lainnya: @js($saringAktif) }">
         <div class="w-28"><x-ui.select label="Tahun" name="tahun" id="rekap-tahun" wire:model.live="tahun" :options="$tahunList" :value="$this->tahun" /></div>
         <div class="w-40"><x-ui.select label="Triwulan" name="tw" id="rekap-tw" wire:model.live="tw" :options="\App\Services\Ekspor\PembangunRekap::TW" placeholder="Semua TW" :value="$this->tw" /></div>
         @if ($pimpinan)
             <div class="w-full min-w-0 sm:w-48"><x-ui.select label="Irban" name="irban" id="rekap-irban" wire:model.live="irban" :options="$irbanOptions" placeholder="Semua irban" :value="$this->irban" /></div>
+        @endif
+        <x-ui.button type="button" variant="secondary" icon="adjustments-horizontal" class="md:hidden" aria-controls="rekap-filter-lainnya"
+            x-on:click="lainnya = ! lainnya" x-bind:aria-expanded="lainnya.toString()">Filter lainnya{{ $jumlahLainnya ? " ({$jumlahLainnya})" : '' }}</x-ui.button>
+        <div id="rekap-filter-lainnya" wire:ignore.self class="flex w-full flex-col gap-3 md:contents {{ $saringAktif ? '' : 'max-md:hidden' }}" x-bind:class="{ 'max-md:hidden': ! lainnya }">
+            <div class="min-w-0 md:w-52"><x-ui.select label="Klasifikasi" name="klasifikasi" id="rekap-klasifikasi" wire:model.live="klasifikasi" :options="$saringOpsi['klasifikasi']" placeholder="Semua klasifikasi" :value="$this->klasifikasi" /></div>
+            <div class="min-w-0 md:w-56"><x-ui.select label="Kode Arsip" name="kode_arsip" id="rekap-kode_arsip" wire:model.live="kode_arsip" :options="$saringOpsi['kode_arsip']" placeholder="Semua kode arsip" :value="$this->kode_arsip" /></div>
+            <div class="min-w-0 md:w-52"><x-ui.select label="Jenis Penugasan" name="jenis" id="rekap-jenis" wire:model.live="jenis" :options="$saringOpsi['jenis']" placeholder="Semua jenis" :value="$this->jenis" /></div>
+        </div>
+        @if ($filterAktif)
+            <x-ui.button type="button" variant="ghost" wire:click="aturUlang">Atur ulang</x-ui.button>
         @endif
     </div>
 
@@ -25,7 +38,7 @@
         :active="$this->tab" model="tab" label="Tampilan rekap" panel="rekap-panel" />
 
     <div id="rekap-panel" role="tabpanel" aria-labelledby="rekap-panel-tab-{{ $this->tab }}"
-        wire:loading.delay.class="opacity-60" wire:loading.delay.attr="aria-busy" wire:target="tahun,tw,tab,irban"
+        wire:loading.delay.class="opacity-60" wire:loading.delay.attr="aria-busy" wire:target="tahun,tw,tab,irban,klasifikasi,kode_arsip,jenis,aturUlang"
         class="space-y-8">
         @foreach ($bagian as $i => $s)
             <section wire:key="bagian-{{ $i }}-{{ $this->tab }}" aria-labelledby="rekap-bagian-{{ $i }}">
@@ -64,6 +77,10 @@
                 </div>
                 @if ($s['kode'] === 'rr' && $catatanTarget)
                     <x-ui.alert variant="info" class="mt-3">{{ \App\Services\Ekspor\PembangunRekap::CATATAN_TARGET }}</x-ui.alert>
+                @endif
+                {{-- 1.3: C1 ("–" cells) or C2, decided by RekapTriwulan::aturanRencana, under each section with a Rencana column. --}}
+                @if ($catatan = \App\Services\Ekspor\PembangunRekap::catatanRencana($rekap, $s['kode']))
+                    <x-ui.alert variant="info" class="mt-3">{{ $catatan }}</x-ui.alert>
                 @endif
                 @if (collect($s['tabel'])->pluck('baris')->flatten(1)->contains(fn ($b) => $b['lebih'] !== null))
                     <p class="mt-2 text-sm text-neutral-600">{{ \App\Services\Ekspor\PembangunRekap::CATATAN_LEBIH }}</p>

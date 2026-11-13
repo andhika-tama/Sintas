@@ -9,6 +9,7 @@ use App\Livewire\Rekap;
 use App\Models\Ekspor as EksporModel;
 use App\Models\Irban;
 use App\Models\JenisPenugasan;
+use App\Models\Klasifikasi;
 use App\Models\Pkpt;
 use App\Models\PkptItem;
 use App\Models\Spt;
@@ -66,6 +67,12 @@ class DetailRealisasiTest extends TestCase
         }
 
         return $t;
+    }
+
+    /** The tab panel only: the filter bar lists every irban and jenis name. */
+    private function panel($t): string
+    {
+        return substr($t->html(), strpos($t->html(), 'id="rekap-panel"'));
     }
 
     private function irbanA(): User
@@ -128,7 +135,9 @@ class DetailRealisasiTest extends TestCase
         $t = $this->detail(User::factory()->create(['role' => Role::Pimpinan]), ['irban' => (string) $this->b->id]);
         $panel = substr($t->html(), strpos($t->html(), 'id="rekap-panel"')); // the Irban filter itself lists every irban
 
-        $t->assertSee('Audit Ketaatan OPD')->assertDontSee('Pengawasan Dana BOS');
+        // 1.3: the Jenis filter lists every jenis name, so the item names are checked in the panel too.
+        $this->assertStringContainsString('Audit Ketaatan OPD', $panel);
+        $this->assertStringNotContainsString('Pengawasan Dana BOS', $panel);
         $this->assertStringContainsString('Irban B', $panel);
         $this->assertStringNotContainsString('Irban A', $panel);
         $this->assertStringNotContainsString('Irban C', $panel);
@@ -136,15 +145,16 @@ class DetailRealisasiTest extends TestCase
 
     public function test_irban_sees_only_own_irban_even_with_tampered_param(): void
     {
-        $this->detail($this->irbanA(), ['irban' => (string) $this->b->id])
-            ->assertSee('Pengawasan Dana BOS')->assertSee('Rekap Saya')
-            ->assertDontSee('Irban B')->assertDontSee('Audit Ketaatan OPD')->assertDontSee('Irban C');
+        $t = $this->detail($this->irbanA(), ['irban' => (string) $this->b->id])
+            ->assertSee('Pengawasan Dana BOS')->assertSee('Rekap Saya')->assertDontSee('Irban B')->assertDontSee('Irban C');
+        $this->assertStringNotContainsString('Audit Ketaatan OPD', $this->panel($t)); // 1.3: the Jenis filter lists every jenis name
     }
 
     public function test_empty_state_for_irban_without_items_in_the_period(): void
     {
-        $this->detail(User::factory()->create(['role' => Role::Pimpinan]), ['irban' => (string) $this->a->id, 'tw' => '3'])
-            ->assertSee('Irban A')->assertSee('Tidak ada item PKPT pada periode ini.')->assertDontSee('Pengawasan Dana BOS');
+        $t = $this->detail(User::factory()->create(['role' => Role::Pimpinan]), ['irban' => (string) $this->a->id, 'tw' => '3'])
+            ->assertSee('Irban A')->assertSee('Tidak ada item PKPT pada periode ini.');
+        $this->assertStringNotContainsString('Pengawasan Dana BOS', $this->panel($t));
     }
 
     /** Rows of every sheet, one after the other (all four sections unless $filter says otherwise). */
@@ -230,5 +240,44 @@ class DetailRealisasiTest extends TestCase
         });
         app()->call([new BuatEkspor($e), 'handle']);
         Notification::assertSentTo($u, EksporGagal::class, fn (EksporGagal $n) => $n->url() === '/irban/rekap');
+    }
+
+    /**
+     * 1.3 Task 2: SPT rows follow the filter; items follow jenis. When the rule hides the rencana (C1), items are listed only through a
+     * matching SPT (an item's rencana alone is not shown). Fixture SPT: BOS item, klasifikasi KHUSUS (factory default), kode 700.
+     */
+    public function test_detail_mengikuti_saring(): void
+    {
+        $u = User::factory()->create(['role' => Role::Pimpinan]);
+        $nomor = e($this->spt->nomor_lengkap);
+        $reguler = Klasifikasi::where('kode', 'REGULER')->value('id');
+        $khusus = Klasifikasi::where('kode', 'KHUSUS')->value('id');
+
+        // KHUSUS (not wajib → C1): only BOS through its SPT; LKjIP and B's item have no KHUSUS SPT.
+        $html = $this->panel($this->detail($u, ['klasifikasi' => (string) $khusus]));
+        $this->assertStringContainsString($nomor, $html);
+        $this->assertStringNotContainsString('Reviu LKjIP', $html);
+        $this->assertStringNotContainsString('Audit Ketaatan OPD', $html);
+
+        // REGULER (wajib → rencana shown): every item listed, the KHUSUS SPT is filtered out.
+        $html = $this->panel($this->detail($u, ['klasifikasi' => (string) $reguler]));
+        $this->assertStringNotContainsString($nomor, $html);
+        foreach (['Pengawasan Dana BOS', 'Reviu LKjIP', 'Audit Ketaatan OPD'] as $teks) {
+            $this->assertStringContainsString($teks, $html, $teks);
+        }
+
+        // Jenis: only the items of that jenis.
+        $bos = PkptItem::whereKey($this->spt->pkpt_item_id)->value('jenis_penugasan_id');
+        $html = $this->panel($this->detail($u, ['jenis' => (string) $bos]));
+        $this->assertStringContainsString($nomor, $html);
+        $this->assertStringNotContainsString('Reviu LKjIP', $html);
+        $this->assertStringNotContainsString('Audit Ketaatan OPD', $html);
+        $this->assertStringNotContainsString('Pengawasan Dana BOS', $this->panel($this->detail($u, ['jenis' => 'lainnya'])));
+
+        // The export uses the same service with the same filter.
+        $p = app(PembangunRekap::class);
+        $pdf = $p->html($u, $p->filter($u, ['tahun' => 2026, 'bagian' => ['detail'], 'klasifikasi' => (string) $khusus]));
+        $this->assertStringContainsString($nomor, $pdf);
+        $this->assertStringNotContainsString('Reviu LKjIP', $pdf);
     }
 }

@@ -11,6 +11,7 @@ use App\Models\Spt;
 use App\Services\Ekspor\PembangunRekap;
 use App\Services\RealisasiItemPkpt;
 use App\Services\RekapTriwulan;
+use App\Services\SaringSpt;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -38,7 +39,17 @@ class Rekap extends Component
     #[Url]
     public string $irban = '';
 
-    private const FILTER = ['tahun', 'tw', 'irban'];
+    /** 1.3: Klasifikasi / Kode Arsip ids and Jenis (master id or 'lainnya'), validated by SaringSpt through PembangunRekap::filter(). */
+    #[Url]
+    public string $klasifikasi = '';
+
+    #[Url]
+    public string $kode_arsip = '';
+
+    #[Url]
+    public string $jenis = '';
+
+    private const FILTER = ['tahun', 'tw', 'irban', 'klasifikasi', 'kode_arsip', 'jenis'];
 
     public function mount(): void
     {
@@ -48,6 +59,13 @@ class Rekap extends Component
     public function updated(string $prop): void
     {
         Gate::authorize('rekap', Spt::class);
+    }
+
+    /** Clears every filter but Tahun. */
+    public function aturUlang(): void
+    {
+        Gate::authorize('rekap', Spt::class);
+        $this->reset('tw', 'irban', 'klasifikasi', 'kode_arsip', 'jenis');
     }
 
     /** Export modal "Pilih isi ekspor": sections picked in $bagianEkspor, format fixed by the button that opened it. */
@@ -98,6 +116,9 @@ class Rekap extends Component
         $this->tahun = (string) $f['tahun'];
         $this->tw = $f['tw'] ? (string) $f['tw'] : '';
         $this->irban = $f['irban'] ? (string) $f['irban'] : '';
+        foreach ($f['saring'] as $k => $v) {
+            $this->{$k} = (string) $v; // unknown URL values fall back visibly, as on Monitoring
+        }
         $this->tab = match (true) {
             $this->tab === 'detail', $pimpinan && $this->tab === 'gabungan' => $this->tab,
             default => 'irban',
@@ -107,7 +128,7 @@ class Rekap extends Component
         // The Detail tab needs only the year's status for its alert, not the whole calculation.
         $rekap = $detail
             ? ['tahun' => $f['tahun'], 'pkpt_disahkan' => Pkpt::where('tahun', $f['tahun'])->where('status', StatusPkpt::Disahkan)->exists()]
-            : app(RekapTriwulan::class)->hitung($f['tahun'], $f['irban']);
+            : app(RekapTriwulan::class)->hitung($f['tahun'], $f['irban'], $f['saring']);
         // An Irban account only lists the years it has SPT or PKPT items in; the current year and the selected one stay.
         $milik = $pimpinan ? null : $user->irban_id;
         $tahunList = Spt::whereNotNull('tahun')->when($milik, fn ($q, $id) => $q->where('irban_id', $id))->distinct()->pluck('tahun')
@@ -118,10 +139,13 @@ class Rekap extends Component
             'judul' => $pimpinan ? 'Rekap Triwulanan' : 'Rekap Saya',
             'rekap' => $rekap,
             'bagian' => $detail ? [] : $pembangun->bagian($rekap, $f['tw'], $this->tab),
-            'catatanTarget' => ! $detail && $pembangun->tanpaTarget($f['tahun'], $f['tw'], $f['irban']) > 0,
-            'detail' => $detail ? app(RealisasiItemPkpt::class)->untuk($f['tahun'], $f['tw'], $f['irban']) : null,
+            'catatanTarget' => ! $detail && $pembangun->tanpaTarget($f['tahun'], $f['tw'], $f['irban'], $f['saring']) > 0,
+            'detail' => $detail ? app(RealisasiItemPkpt::class)->untuk($f['tahun'], $f['tw'], $f['irban'], $f['saring']) : null,
             'tahunList' => $tahunList,
             'irbanOptions' => $pimpinan ? Irban::orderBy('nama')->pluck('nama', 'id')->all() : [],
+            'saringOpsi' => app(SaringSpt::class)->opsi(),
+            'saringAktif' => app(SaringSpt::class)->aktif($f['saring']),
+            'filterAktif' => $f['tw'] || $f['irban'] && $pimpinan || app(SaringSpt::class)->aktif($f['saring']),
             'pimpinan' => $pimpinan,
         ])->title($pimpinan ? 'Rekap Triwulanan' : 'Rekap Saya');
     }
